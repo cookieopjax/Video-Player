@@ -7,7 +7,7 @@ function readConfig() {
   try {
     return JSON.parse(fs.readFileSync(configPath, 'utf-8'))
   } catch {
-    return { speeds: [0.5, 1.0, 1.5, 2.0], jumpSeconds: 10, defaultVolume: 70 }
+    return { speeds: [0.5, 1.0, 1.5, 2.0], jumpSeconds: 10, defaultVolume: 70, autoPlay: true }
   }
 }
 

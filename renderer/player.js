@@ -295,7 +295,7 @@ function loadFile(filePath) {
   video.src = 'file:///' + filePath.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/')
   video.playbackRate = currentSpeed
   filenameEl.innerHTML = formatPath(filePath)
-  video.play()
+  if (config.autoPlay !== false) video.play()
 }
 
 document.getElementById('btn-open').addEventListener('click', async () => {
@@ -441,6 +441,7 @@ function openSettings() {
   jumpInput.value = config.jumpSeconds
   volDefaultInput.value = config.defaultVolume
   volDefaultLabel.textContent = config.defaultVolume + '%'
+  document.getElementById('autoplay-input').checked = config.autoPlay !== false
   settingsOverlay.classList.remove('hidden')
   requestAnimationFrame(() => settingsOverlay.classList.add('visible'))
 }
@@ -476,6 +477,7 @@ document.getElementById('btn-settings-save').addEventListener('click', async () 
     speeds:        editSpeeds,
     jumpSeconds:   parseInt(jumpInput.value) || 10,
     defaultVolume: parseInt(volDefaultInput.value),
+    autoPlay:      document.getElementById('autoplay-input').checked,
   }
   await window.electronAPI.saveConfig(newConfig)
   config = newConfig
