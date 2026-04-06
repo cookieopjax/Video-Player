@@ -8,5 +8,6 @@
   ],
   "jumpSeconds": 15,
   "defaultVolume": 70,
-  "autoPlay": true
+  "autoPlay": false,
+  "resumeAfterCrop": false
 }

@@ -330,9 +330,10 @@ function showToast(msg) {
 }
 
 // ── Screenshot / Crop ──────────────────────────────────────────
-let cropStart  = null
-let cropCtx    = null
-let isCropping = false
+let cropStart        = null
+let cropCtx          = null
+let isCropping       = false
+let cropWasPlaying   = false
 
 function canvasPosFromEvent(e) {
   const rect = cropCanvas.getBoundingClientRect()
@@ -344,7 +345,9 @@ function canvasPosFromEvent(e) {
 
 function startCrop() {
   if (!video.src) return
-  const container = cropCanvas.parentElement   // #video-container, always visible
+  cropWasPlaying = !video.paused
+  if (cropWasPlaying) video.pause()
+  const container = cropCanvas.parentElement
   cropCanvas.width  = container.clientWidth
   cropCanvas.height = container.clientHeight
   cropCtx = cropCanvas.getContext('2d')
@@ -369,6 +372,7 @@ async function finalizeCrop(x1, y1, x2, y2) {
   cropCanvas.classList.remove('active')
   isCropping = false
   cropStart  = null
+  if (cropWasPlaying && config.resumeAfterCrop) video.play()
   const rx = Math.min(x1, x2), ry = Math.min(y1, y2)
   const rw = Math.abs(x2 - x1), rh = Math.abs(y2 - y1)
   if (rw < 4 || rh < 4) return
@@ -413,6 +417,7 @@ document.addEventListener('keydown', (e) => {
     cropCanvas.classList.remove('active')
     isCropping = false
     cropStart  = null
+    if (cropWasPlaying) video.play()
   }
 })
 
@@ -442,6 +447,7 @@ function openSettings() {
   volDefaultInput.value = config.defaultVolume
   volDefaultLabel.textContent = config.defaultVolume + '%'
   document.getElementById('autoplay-input').checked = config.autoPlay !== false
+  document.getElementById('resume-after-crop-input').checked = !!config.resumeAfterCrop
   settingsOverlay.classList.remove('hidden')
   requestAnimationFrame(() => settingsOverlay.classList.add('visible'))
 }
@@ -477,7 +483,8 @@ document.getElementById('btn-settings-save').addEventListener('click', async () 
     speeds:        editSpeeds,
     jumpSeconds:   parseInt(jumpInput.value) || 10,
     defaultVolume: parseInt(volDefaultInput.value),
-    autoPlay:      document.getElementById('autoplay-input').checked,
+    autoPlay:         document.getElementById('autoplay-input').checked,
+    resumeAfterCrop:  document.getElementById('resume-after-crop-input').checked,
   }
   await window.electronAPI.saveConfig(newConfig)
   config = newConfig
