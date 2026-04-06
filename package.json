@@ -17,14 +17,27 @@
   "build": {
     "appId": "com.local.videoplayer",
     "productName": "VideoPlayer",
+    "icon": "assets/icon.png",
+    "compression": "normal",
     "win": {
-      "target": "nsis"
+      "target": [
+        { "target": "nsis",     "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "artifactName": "${productName}-${version}-${arch}-${target}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
     },
     "files": [
       "main.js",
       "preload.js",
-      "renderer/**/*",
-      "config.json"
+      "renderer/**/*"
+    ],
+    "extraResources": [
+      { "from": "config.json", "to": "default-config.json" }
     ]
   },
   "keywords": [],

@@ -78,6 +78,20 @@ video.addEventListener('playing',   () => loadingOverlay.classList.add('hidden')
 video.addEventListener('canplay',   () => loadingOverlay.classList.add('hidden'))
 video.addEventListener('loadstart', () => loadingOverlay.classList.remove('hidden'))
 
+// ── Video error ────────────────────────────────────────────────
+video.addEventListener('error', () => {
+  loadingOverlay.classList.add('hidden')
+  const err = video.error
+  const MSG = {
+    1: '載入中止',
+    2: '網路錯誤',
+    3: '解碼失敗',
+    4: '格式不支援',
+  }
+  const detail = err ? (MSG[err.code] || `錯誤 ${err.code}`) : '未知錯誤'
+  showToast(`無法播放：${detail}`)
+})
+
 // ── Progress bar ───────────────────────────────────────────────
 function setProgress(pct) {
   progressFill.style.width = pct + '%'
@@ -288,14 +302,25 @@ function formatPath(filePath) {
   return `<strong>${parts[parts.length - 1]}</strong>`
 }
 
+const SUPPORTED_EXTS = new Set(['mp4', 'webm', 'mov', 'avi', 'mkv', 'm4v', 'flv', 'wmv'])
+
+function isSupportedVideo(filePath) {
+  const ext = filePath.split('.').pop().toLowerCase()
+  return SUPPORTED_EXTS.has(ext)
+}
+
 function loadFile(filePath) {
+  if (!isSupportedVideo(filePath)) {
+    showToast('不支援的格式')
+    return
+  }
   currentFilePath = filePath
   addRecentFile(filePath)
   document.getElementById('recent-overlay').classList.add('hidden')
   video.src = 'file:///' + filePath.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/')
   video.playbackRate = currentSpeed
   filenameEl.innerHTML = formatPath(filePath)
-  if (config.autoPlay !== false) video.play()
+  if (config.autoPlay !== false) video.play().catch(() => { /* autoplay blocked — ignored */ })
 }
 
 document.getElementById('btn-open').addEventListener('click', async () => {
@@ -309,7 +334,7 @@ document.addEventListener('drop', (e) => {
   e.preventDefault()
   dropOverlay.classList.remove('active')
   const file = e.dataTransfer.files[0]
-  if (file) loadFile(file.path)
+  if (file && file.path) loadFile(file.path)
 })
 
 // ── Window controls ────────────────────────────────────────────
@@ -386,9 +411,15 @@ async function finalizeCrop(x1, y1, x2, y2) {
   offscreen.width = Math.round(sw); offscreen.height = Math.round(sh)
   offscreen.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, offscreen.width, offscreen.height)
   offscreen.toBlob(async (blob) => {
-    const buf = await blob.arrayBuffer()
-    await window.electronAPI.copyImage(new Uint8Array(buf))
-    showToast('已複製到剪貼簿')
+    try {
+      const buf = await blob.arrayBuffer()
+      const result = await window.electronAPI.copyImage(new Uint8Array(buf))
+      if (result && result.ok === false) throw new Error(result.error)
+      showToast('已複製到剪貼簿')
+    } catch (err) {
+      console.error('[finalizeCrop]', err)
+      showToast('截圖失敗')
+    }
   }, 'image/png')
 }
 
@@ -480,23 +511,35 @@ speedInput.addEventListener('keydown', (e) => {
 document.getElementById('btn-settings-save').addEventListener('click', async () => {
   if (!editSpeeds.length) return
   const newConfig = {
-    speeds:        editSpeeds,
-    jumpSeconds:   parseInt(jumpInput.value) || 10,
-    defaultVolume: parseInt(volDefaultInput.value),
-    autoPlay:         document.getElementById('autoplay-input').checked,
-    resumeAfterCrop:  document.getElementById('resume-after-crop-input').checked,
+    speeds:          editSpeeds,
+    jumpSeconds:     parseInt(jumpInput.value) || 10,
+    defaultVolume:   parseInt(volDefaultInput.value),
+    autoPlay:        document.getElementById('autoplay-input').checked,
+    resumeAfterCrop: document.getElementById('resume-after-crop-input').checked,
   }
-  await window.electronAPI.saveConfig(newConfig)
-  config = newConfig
-  buildSpeedMenu()
-  updateJumpLabels()
-  closeSettings()
-  showToast('設定已儲存')
+  try {
+    const result = await window.electronAPI.saveConfig(newConfig)
+    if (result && result.ok === false) throw new Error(result.error)
+    config = newConfig
+    buildSpeedMenu()
+    updateJumpLabels()
+    closeSettings()
+    showToast('設定已儲存')
+  } catch (err) {
+    console.error('[saveConfig]', err)
+    showToast('儲存失敗')
+  }
 })
 
 // ── Init ───────────────────────────────────────────────────────
 async function init() {
-  config = await window.electronAPI.getConfig()
+  try {
+    const raw = await window.electronAPI.getConfig()
+    config = normalizeConfig(raw)
+  } catch (err) {
+    console.error('[init] getConfig failed, using defaults', err)
+    config = normalizeConfig(null)
+  }
 
   // Restore saved speed (before buildSpeedMenu so active class is correct)
   const savedSpeed = parseFloat(localStorage.getItem('playbackSpeed'))
