@@ -1,5 +1,13 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ── Button focus ring ─────────────────────────────────────── */
+button:focus          { outline: none; }
+button:focus-visible  { outline: none; animation: focus-ring-fade 3s ease forwards; }
+@keyframes focus-ring-fade {
+  0%, 50% { box-shadow: 0 0 0 1.5px rgba(255,255,255,0.30); }
+  100%    { box-shadow: 0 0 0 1.5px rgba(255,255,255,0); }
+}
+
 :root {
   --bg:           #1c1c1e;
   --glass-bg:     rgba(30, 30, 32, 0.42);
