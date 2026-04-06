@@ -52,40 +52,46 @@
 
     <div id="btn-row">
 
-      <button id="btn-open" class="btn" title="開啟檔案">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-      </button>
-
-      <button id="btn-playpause" class="btn btn-play" title="播放/暫停 (Space)">
-        <!-- SVG swapped by player.js -->
-        <svg id="icon-play" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
-        <svg id="icon-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-      </button>
-
-      <button id="btn-backward" class="btn btn-jump" title="後退 (←)">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
-        <span id="label-backward">10s</span>
-      </button>
-
-      <button id="btn-forward" class="btn btn-jump" title="前進 (→)">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.5"/></svg>
-        <span id="label-forward">10s</span>
-      </button>
-
-      <div id="spacer"></div>
-
-      <div id="volume-wrap">
-        <span id="vol-icon">&#128266;</span>
-        <div id="vol-track">
-          <div id="vol-fill"></div>
-          <div id="vol-thumb"></div>
-        </div>
-        <span id="vol-label">70%</span>
+      <!-- Left: open -->
+      <div id="controls-left">
+        <button id="btn-open" class="btn" title="開啟檔案">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </button>
       </div>
 
-      <div id="speed-wrap">
-        <button id="btn-speed" class="btn btn-speed">1.0x &#9662;</button>
-        <div id="speed-dropdown" class="hidden"></div>
+      <!-- Center: backward / play / forward -->
+      <div id="controls-center">
+        <button id="btn-backward" class="btn btn-jump" title="後退 (←)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+          <span id="label-backward">10s</span>
+        </button>
+
+        <button id="btn-playpause" class="btn btn-play" title="播放/暫停 (Space)">
+          <svg id="icon-play" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+          <svg id="icon-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        </button>
+
+        <button id="btn-forward" class="btn btn-jump" title="前進 (→)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.5"/></svg>
+          <span id="label-forward">10s</span>
+        </button>
+      </div>
+
+      <!-- Right: volume + speed -->
+      <div id="controls-right">
+        <div id="volume-wrap">
+          <span id="vol-icon">&#128266;</span>
+          <div id="vol-track">
+            <div id="vol-fill"></div>
+            <div id="vol-thumb"></div>
+          </div>
+          <span id="vol-label">70%</span>
+        </div>
+
+        <div id="speed-wrap">
+          <button id="btn-speed" class="btn btn-speed">1.0x &#9662;</button>
+          <div id="speed-dropdown" class="hidden"></div>
+        </div>
       </div>
 
     </div>

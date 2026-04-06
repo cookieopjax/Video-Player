@@ -66,6 +66,7 @@ html, body {
   background: #000;
   display: block;
   min-height: 0;
+  cursor: pointer;
 }
 
 /* ── Loading spinner ───────────────────────────────────────── */
@@ -137,7 +138,7 @@ html, body {
 #time-display { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
 
 /* ── Progress bar (no transitions — prevents drag lag) ─────── */
-#progress-wrap { padding: 6px 16px; cursor: pointer; }
+#progress-wrap { padding: 12px 16px; cursor: pointer; }
 #progress-track {
   background: rgba(255,255,255,0.12);
   border-radius: 4px; height: 4px; position: relative;
@@ -154,12 +155,23 @@ html, body {
   box-shadow: 0 0 6px rgba(52, 211, 153, 0.8);
 }
 
-/* ── Button row ────────────────────────────────────────────── */
+/* ── Button row (3-column: left | center | right) ──────────── */
 #btn-row {
   padding: 8px 16px 12px;
+  display: flex; align-items: center;
+}
+#controls-left {
+  flex: 1;
   display: flex; align-items: center; gap: 8px;
 }
-#spacer { flex: 1; }
+#controls-center {
+  display: flex; align-items: center; gap: 8px;
+}
+#controls-right {
+  flex: 1;
+  display: flex; align-items: center; gap: 8px;
+  justify-content: flex-end;
+}
 
 .btn {
   background: rgba(255,255,255,0.07);

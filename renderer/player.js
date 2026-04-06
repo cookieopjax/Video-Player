@@ -25,6 +25,8 @@ let config             = { speeds: [0.5, 1.0, 1.5, 2.0], jumpSeconds: 10, defaul
 let isDraggingProgress = false
 let isDraggingVolume   = false
 let currentSpeed       = 1.0
+let currentFilePath    = ''
+let saveTimer          = null
 
 // ── Play / Pause (SVG icons) ───────────────────────────────────
 function updatePlayButton() {
@@ -33,9 +35,12 @@ function updatePlayButton() {
   iconPause.style.display = !paused ? '' : 'none'
 }
 
-btnPlayPause.addEventListener('click', () => {
+function togglePlay() {
   if (video.src) video.paused ? video.play() : video.pause()
-})
+}
+
+btnPlayPause.addEventListener('click', togglePlay)
+video.addEventListener('click', togglePlay)
 video.addEventListener('play',  updatePlayButton)
 video.addEventListener('pause', updatePlayButton)
 video.addEventListener('ended', updatePlayButton)
@@ -58,10 +63,24 @@ function updateProgress() {
   timeDisplay.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`
 }
 
-video.addEventListener('timeupdate', updateProgress)
+video.addEventListener('timeupdate', () => {
+  updateProgress()
+  // Save position every ~4 seconds
+  if (!currentFilePath || !video.duration) return
+  clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    localStorage.setItem('pos:' + currentFilePath, video.currentTime)
+  }, 4000)
+})
+
 video.addEventListener('loadedmetadata', () => {
   timeDisplay.textContent = `00:00 / ${formatTime(video.duration)}`
   setProgress(0)
+  // Restore saved position
+  const saved = parseFloat(localStorage.getItem('pos:' + currentFilePath))
+  if (saved > 0 && saved < video.duration - 2) {
+    video.currentTime = saved
+  }
 })
 
 function seekFromEvent(e) {
@@ -182,6 +201,7 @@ function formatPath(filePath) {
 }
 
 function loadFile(filePath) {
+  currentFilePath = filePath
   video.src = 'file:///' + filePath.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/')
   filenameEl.innerHTML = formatPath(filePath)
   video.play()
