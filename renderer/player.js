@@ -366,7 +366,7 @@ function isSupportedVideo(filePath) {
   return SUPPORTED_EXTS.has(ext)
 }
 
-function loadFile(filePath) {
+function loadFile(filePath, forcePlay = false) {
   if (!isSupportedVideo(filePath)) {
     showToast('不支援的格式')
     return
@@ -377,7 +377,7 @@ function loadFile(filePath) {
   video.src = 'file:///' + filePath.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/')
   video.playbackRate = currentSpeed
   filenameEl.innerHTML = formatPath(filePath)
-  if (config.autoPlay !== false) video.play().catch(() => { /* autoplay blocked — ignored */ })
+  if (forcePlay || config.autoPlay !== false) video.play().catch(() => { /* autoplay blocked — ignored */ })
 }
 
 document.getElementById('btn-open').addEventListener('click', async () => {
@@ -622,6 +622,10 @@ document.getElementById('btn-confirm-save').addEventListener('click', async () =
   if (await doSaveSettings()) closeSettings(true)
 })
 document.getElementById('btn-confirm-discard').addEventListener('click', () => closeSettings(true))
+document.getElementById('btn-set-default').addEventListener('click', async () => {
+  await window.electronAPI.openDefaultAppsSettings()
+  showToast('請在 Windows 設定中找到 VideoPlayer 並完成設定')
+})
 
 // ── Auto-updater UI ────────────────────────────────────────────
 const updateStatusText    = document.getElementById('update-status-text')
@@ -684,6 +688,11 @@ btnInstallUpdate.addEventListener('click', () => window.electronAPI.installUpdat
 
 window.electronAPI.onUpdateStatus((status) => {
   setUpdateUI(status.state, status)
+})
+
+// ── Open via file association / double-click ───────────────────
+window.electronAPI.onFileArg((filePath) => {
+  loadFile(filePath, true)
 })
 
 // ── Init ───────────────────────────────────────────────────────

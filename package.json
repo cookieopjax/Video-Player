@@ -1,6 +1,6 @@
 {
   "name": "video-player",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "description": "Personal video player",
   "main": "main.js",
   "scripts": {
@@ -19,6 +19,14 @@
     "productName": "VideoPlayer",
     "icon": "assets/icon.png",
     "compression": "normal",
+    "fileAssociations": [
+      {
+        "ext": ["mp4", "webm", "mov", "avi", "mkv", "m4v", "flv", "wmv"],
+        "name": "Video File",
+        "description": "Video File",
+        "role": "Viewer"
+      }
+    ],
     "win": {
       "target": [
         {

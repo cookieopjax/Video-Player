@@ -15,4 +15,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateStatus: (cb) => {
     ipcRenderer.on('update-status', (_, status) => cb(status))
   },
+  onFileArg: (cb) => {
+    ipcRenderer.on('open-file-arg', (_, filePath) => cb(filePath))
+  },
+  openDefaultAppsSettings: () => ipcRenderer.invoke('open-default-apps-settings'),
 })

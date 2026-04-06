@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, clipboard, nativeImage } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, clipboard, nativeImage, shell } = require('electron')
 const path = require('path')
 const fs   = require('fs')
 const { autoUpdater } = require('electron-updater')
@@ -49,8 +49,28 @@ autoUpdater.on('download-progress',    (p)    => sendUpdateStatus({ state: 'down
 autoUpdater.on('update-downloaded',    ()     => sendUpdateStatus({ state: 'downloaded' }))
 autoUpdater.on('error',                (err)  => sendUpdateStatus({ state: 'error', message: err.message }))
 
+// ── File arg helpers ───────────────────────────────────────────
+const VIDEO_EXTS = new Set(['mp4', 'webm', 'mov', 'avi', 'mkv', 'm4v', 'flv', 'wmv'])
+
+function findFileArg(argv) {
+  // argv[0] is the executable; skip flags (--xxx)
+  for (const arg of argv.slice(1)) {
+    if (arg.startsWith('-')) continue
+    const ext = arg.split('.').pop().toLowerCase()
+    if (VIDEO_EXTS.has(ext)) return arg
+  }
+  return null
+}
+
+// ── Single-instance lock ───────────────────────────────────────
+const gotSingleLock = app.requestSingleInstanceLock()
+if (!gotSingleLock) {
+  app.quit()
+}
+
 // ── Window ─────────────────────────────────────────────────────
 let mainWin = null
+let pendingFileArg = null
 
 function createWindow() {
   mainWin = new BrowserWindow({
@@ -63,9 +83,27 @@ function createWindow() {
     },
   })
   mainWin.loadFile('renderer/index.html')
+  // Send pending file arg once the renderer is ready
+  mainWin.webContents.once('did-finish-load', () => {
+    if (pendingFileArg) {
+      mainWin.webContents.send('open-file-arg', pendingFileArg)
+      pendingFileArg = null
+    }
+  })
 }
 
+app.on('second-instance', (event, argv) => {
+  // Another instance was launched — bring this window to front and open the file
+  const filePath = findFileArg(argv)
+  if (mainWin) {
+    if (mainWin.isMinimized()) mainWin.restore()
+    mainWin.focus()
+    if (filePath) mainWin.webContents.send('open-file-arg', filePath)
+  }
+})
+
 app.whenReady().then(() => {
+  pendingFileArg = findFileArg(process.argv)
   createWindow()
   // Auto-check for updates after window is ready (3s delay)
   if (app.isPackaged) {
@@ -134,4 +172,8 @@ ipcMain.handle('download-update', () => {
 
 ipcMain.handle('install-update', () => {
   autoUpdater.quitAndInstall()
+})
+
+ipcMain.handle('open-default-apps-settings', async () => {
+  await shell.openExternal('ms-settings:defaultapps')
 })
