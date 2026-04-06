@@ -261,7 +261,7 @@ volIcon.addEventListener('click', (e) => {
 
 // Compact mode detection
 function updateVolCompact() {
-  const compact = window.innerWidth < 750
+  const compact = window.innerWidth < 820
   document.body.classList.toggle('vol-compact', compact)
   if (!compact) volPopup.classList.add('hidden')
 }
@@ -625,6 +625,11 @@ async function init() {
   video.playbackRate = currentSpeed
   btnSpeed.textContent = currentSpeed + 'x \u25BE'
   updateVolCompact()
+
+  try {
+    const ver = await window.electronAPI.getVersion()
+    document.getElementById('settings-version').textContent = 'v' + ver
+  } catch { /* ignore */ }
 }
 
 init()

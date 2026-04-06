@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('electronAPI', {
   getConfig:   () => ipcRenderer.invoke('get-config'),
+  getVersion:  () => ipcRenderer.invoke('get-version'),
   openFile:    () => ipcRenderer.invoke('open-file'),
   winMinimize: () => ipcRenderer.invoke('win-minimize'),
   winMaximize: () => ipcRenderer.invoke('win-maximize'),

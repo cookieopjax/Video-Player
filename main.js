@@ -52,7 +52,8 @@ function createWindow() {
 app.whenReady().then(createWindow)
 app.on('window-all-closed', () => app.quit())
 
-ipcMain.handle('get-config', () => readConfig())
+ipcMain.handle('get-config',   () => readConfig())
+ipcMain.handle('get-version', () => app.getVersion())
 
 ipcMain.handle('open-file', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({

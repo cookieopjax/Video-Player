@@ -20,6 +20,9 @@ button:focus-visible  { outline: none; animation: focus-ring-fade 3s ease forwar
   --fill:         rgba(255, 255, 255, 0.88);
   --fill-track:   rgba(255, 255, 255, 0.14);
   --titlebar-h:   34px;
+  --accent:       rgba(66, 148, 255, 0.82);
+  --accent-hover: rgba(66, 148, 255, 1);
+  --accent-border:rgba(66, 148, 255, 0.5);
 }
 
 html, body {
@@ -246,13 +249,13 @@ body.fullscreen #controls.controls-visible {
 }
 .btn-icon:hover { background: var(--btn-bg); border-color: var(--btn-border); }
 
-/* Play button — slightly emphasized */
+/* Play button — accent color, same vertical padding as jump buttons */
 .btn-play {
-  padding: 7px 18px;
-  background: rgba(255,255,255,0.1);
-  border-color: rgba(255,255,255,0.12);
+  padding: 6px 18px;
+  background: var(--accent);
+  border-color: var(--accent-border);
 }
-.btn-play:hover { background: rgba(255,255,255,0.18); }
+.btn-play:hover { background: var(--accent-hover); }
 
 .btn-jump svg { flex-shrink: 0; }
 .btn-jump { color: var(--text); font-size: 12px; }
@@ -580,7 +583,11 @@ body.vol-compact #vol-icon:hover { background: var(--btn-bg); }
 
 #settings-footer {
   padding: 12px 16px;
-  display: flex; justify-content: flex-end;
+  display: flex; align-items: center; justify-content: space-between;
+}
+#settings-version {
+  font-size: 11px; color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 .btn-save {
   background: rgba(255,255,255,0.12);
