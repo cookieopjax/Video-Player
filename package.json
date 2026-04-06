@@ -1,0 +1,29 @@
+{
+  "name": "video-player",
+  "version": "1.0.0",
+  "description": "Personal video player",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "jest",
+    "build": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^26.8.1",
+    "jest": "^30.3.0"
+  },
+  "build": {
+    "appId": "com.local.videoplayer",
+    "productName": "VideoPlayer",
+    "win": {
+      "target": "nsis"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "config.json"
+    ]
+  }
+}
