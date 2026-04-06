@@ -155,6 +155,11 @@ document.getElementById('btn-forward').addEventListener('click', () => {
 
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return
+  if (e.code === 'KeyO' && e.ctrlKey) {
+    e.preventDefault()
+    document.getElementById('btn-open').click()
+    return
+  }
   switch (e.code) {
     case 'Space':
       e.preventDefault()
@@ -234,8 +239,43 @@ document.addEventListener('mousemove', () => {
   if (document.body.classList.contains('fullscreen')) showControls()
 })
 
-video.addEventListener('dblclick', toggleFullscreen)
 document.getElementById('btn-fullscreen').addEventListener('click', toggleFullscreen)
+
+// ── Recent files ───────────────────────────────────────────────
+const RECENT_KEY = 'recentFiles'
+const RECENT_MAX = 8
+
+function getRecentFiles() {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || [] } catch { return [] }
+}
+
+function addRecentFile(filePath) {
+  let list = getRecentFiles().filter(p => p !== filePath)
+  list.unshift(filePath)
+  localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_MAX)))
+}
+
+function fileLabel(filePath) {
+  const parts = filePath.replace(/\\/g, '/').split('/')
+  return parts.length >= 2
+    ? `<span class="rf-folder">${parts[parts.length - 2]}/</span><span class="rf-name">${parts[parts.length - 1]}</span>`
+    : `<span class="rf-name">${parts[parts.length - 1]}</span>`
+}
+
+function renderRecentFiles() {
+  const overlay = document.getElementById('recent-overlay')
+  const list    = getRecentFiles()
+  if (list.length === 0) { overlay.classList.add('hidden'); return }
+  overlay.classList.remove('hidden')
+  const ul = overlay.querySelector('#recent-list')
+  ul.innerHTML = ''
+  list.forEach(fp => {
+    const li = document.createElement('li')
+    li.innerHTML = fileLabel(fp)
+    li.addEventListener('click', () => loadFile(fp))
+    ul.appendChild(li)
+  })
+}
 
 // ── File opening ───────────────────────────────────────────────
 function formatPath(filePath) {
@@ -248,6 +288,8 @@ function formatPath(filePath) {
 
 function loadFile(filePath) {
   currentFilePath = filePath
+  addRecentFile(filePath)
+  document.getElementById('recent-overlay').classList.add('hidden')
   video.src = 'file:///' + filePath.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/')
   filenameEl.innerHTML = formatPath(filePath)
   video.play()
@@ -285,16 +327,27 @@ function showToast(msg) {
 }
 
 // ── Screenshot / Crop ──────────────────────────────────────────
-let cropStart = null
-let cropCtx   = null
+let cropStart  = null
+let cropCtx    = null
+let isCropping = false
+
+function canvasPosFromEvent(e) {
+  const rect = cropCanvas.getBoundingClientRect()
+  return {
+    x: clamp(e.clientX - rect.left, 0, cropCanvas.width),
+    y: clamp(e.clientY - rect.top,  0, cropCanvas.height),
+  }
+}
 
 function startCrop() {
   if (!video.src) return
-  cropCanvas.width  = cropCanvas.offsetWidth
-  cropCanvas.height = cropCanvas.offsetHeight
+  const rect = cropCanvas.getBoundingClientRect()
+  cropCanvas.width  = rect.width
+  cropCanvas.height = rect.height
   cropCtx = cropCanvas.getContext('2d')
   cropCanvas.classList.add('active')
-  cropStart = null
+  cropStart  = null
+  isCropping = false
 }
 
 function drawCropRect(x1, y1, x2, y2) {
@@ -304,13 +357,15 @@ function drawCropRect(x1, y1, x2, y2) {
   const rx = Math.min(x1, x2), ry = Math.min(y1, y2)
   const rw = Math.abs(x2 - x1), rh = Math.abs(y2 - y1)
   cropCtx.clearRect(rx, ry, rw, rh)
-  cropCtx.strokeStyle = 'rgba(255,255,255,0.8)'
-  cropCtx.lineWidth = 1
-  cropCtx.strokeRect(rx, ry, rw, rh)
+  cropCtx.strokeStyle = 'rgba(255,255,255,0.85)'
+  cropCtx.lineWidth = 1.5
+  cropCtx.strokeRect(rx + 0.5, ry + 0.5, rw, rh)
 }
 
 async function finalizeCrop(x1, y1, x2, y2) {
   cropCanvas.classList.remove('active')
+  isCropping = false
+  cropStart  = null
   const rx = Math.min(x1, x2), ry = Math.min(y1, y2)
   const rw = Math.abs(x2 - x1), rh = Math.abs(y2 - y1)
   if (rw < 4 || rh < 4) return
@@ -321,8 +376,8 @@ async function finalizeCrop(x1, y1, x2, y2) {
   const sw = rw * scaleX, sh = rh * scaleY
 
   const offscreen = document.createElement('canvas')
-  offscreen.width = sw; offscreen.height = sh
-  offscreen.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh)
+  offscreen.width = Math.round(sw); offscreen.height = Math.round(sh)
+  offscreen.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, offscreen.width, offscreen.height)
   offscreen.toBlob(async (blob) => {
     const buf = await blob.arrayBuffer()
     await window.electronAPI.copyImage(new Uint8Array(buf))
@@ -331,23 +386,30 @@ async function finalizeCrop(x1, y1, x2, y2) {
 }
 
 cropCanvas.addEventListener('mousedown', (e) => {
-  cropStart = { x: e.offsetX, y: e.offsetY }
+  e.preventDefault()
+  const pos = canvasPosFromEvent(e)
+  cropStart  = pos
+  isCropping = true
+  cropCtx.clearRect(0, 0, cropCanvas.width, cropCanvas.height)
 })
-cropCanvas.addEventListener('mousemove', (e) => {
-  if (!cropStart) return
-  drawCropRect(cropStart.x, cropStart.y, e.offsetX, e.offsetY)
+
+document.addEventListener('mousemove', (e) => {
+  if (!isCropping || !cropStart) return
+  const pos = canvasPosFromEvent(e)
+  drawCropRect(cropStart.x, cropStart.y, pos.x, pos.y)
 })
-cropCanvas.addEventListener('mouseup', (e) => {
-  if (!cropStart) return
-  finalizeCrop(cropStart.x, cropStart.y, e.offsetX, e.offsetY)
-  cropStart = null
+
+document.addEventListener('mouseup', (e) => {
+  if (!isCropping || !cropStart) return
+  const pos = canvasPosFromEvent(e)
+  finalizeCrop(cropStart.x, cropStart.y, pos.x, pos.y)
 })
-cropCanvas.addEventListener('keydown', (e) => {
-  if (e.code === 'Escape') { cropCanvas.classList.remove('active'); cropStart = null }
-})
+
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Escape' && cropCanvas.classList.contains('active')) {
-    cropCanvas.classList.remove('active'); cropStart = null
+    cropCanvas.classList.remove('active')
+    isCropping = false
+    cropStart  = null
   }
 })
 
@@ -377,11 +439,17 @@ function openSettings() {
   volDefaultInput.value = config.defaultVolume
   volDefaultLabel.textContent = config.defaultVolume + '%'
   settingsOverlay.classList.remove('hidden')
+  requestAnimationFrame(() => settingsOverlay.classList.add('visible'))
+}
+
+function closeSettings() {
+  settingsOverlay.classList.remove('visible')
+  settingsOverlay.addEventListener('transitionend', () => settingsOverlay.classList.add('hidden'), { once: true })
 }
 
 document.getElementById('btn-settings').addEventListener('click', openSettings)
-document.getElementById('btn-settings-close').addEventListener('click', () => settingsOverlay.classList.add('hidden'))
-settingsOverlay.addEventListener('click', (e) => { if (e.target === settingsOverlay) settingsOverlay.classList.add('hidden') })
+document.getElementById('btn-settings-close').addEventListener('click', closeSettings)
+settingsOverlay.addEventListener('click', (e) => { if (e.target === settingsOverlay) closeSettings() })
 
 volDefaultInput.addEventListener('input', () => {
   volDefaultLabel.textContent = volDefaultInput.value + '%'
@@ -410,7 +478,7 @@ document.getElementById('btn-settings-save').addEventListener('click', async () 
   config = newConfig
   buildSpeedMenu()
   updateJumpLabels()
-  settingsOverlay.classList.add('hidden')
+  closeSettings()
   showToast('設定已儲存')
 })
 
@@ -420,6 +488,7 @@ async function init() {
   setVolume(config.defaultVolume / 100)
   buildSpeedMenu()
   updateJumpLabels()
+  renderRecentFiles()
 }
 
 init()

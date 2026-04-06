@@ -309,6 +309,48 @@ body.fullscreen #controls.controls-visible {
 }
 #crop-canvas.active { display: block; }
 
+/* ── Recent files overlay ──────────────────────────────────────── */
+#recent-overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 5;
+  background: #000;
+}
+#recent-overlay.hidden { display: none; }
+
+#recent-panel {
+  text-align: center;
+  width: 100%; max-width: 420px;
+  padding: 0 24px;
+}
+#recent-title {
+  font-size: 11px; font-weight: 500; text-transform: uppercase;
+  letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 14px;
+}
+#recent-list {
+  list-style: none; display: flex; flex-direction: column; gap: 4px;
+  margin-bottom: 20px;
+}
+#recent-list li {
+  padding: 9px 14px; border-radius: 8px;
+  background: var(--btn-bg); border: 1px solid var(--btn-border);
+  cursor: pointer; font-size: 13px; text-align: left;
+  display: flex; align-items: center; gap: 4px;
+  transition: background 0.12s;
+  overflow: hidden;
+}
+#recent-list li:hover { background: var(--btn-hover); }
+.rf-folder { color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
+.rf-name   { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+#recent-hint {
+  font-size: 11px; color: var(--text-muted);
+}
+#recent-hint kbd {
+  display: inline-block; padding: 1px 5px; border-radius: 4px;
+  background: var(--btn-bg); border: 1px solid var(--btn-border);
+  font-size: 10px; font-family: inherit;
+}
+
 /* ── Settings overlay ──────────────────────────────────────── */
 #settings-overlay {
   position: fixed; inset: 0;
@@ -317,8 +359,12 @@ body.fullscreen #controls.controls-visible {
   -webkit-backdrop-filter: blur(8px);
   z-index: 200;
   display: flex; align-items: center; justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
 }
-#settings-overlay.hidden { display: none; }
+#settings-overlay.visible { opacity: 1; pointer-events: auto; }
+#settings-overlay.hidden  { display: none; }
 
 #settings-panel {
   background: rgba(28, 28, 30, 0.92);
@@ -329,6 +375,13 @@ body.fullscreen #controls.controls-visible {
   width: 340px;
   box-shadow: 0 8px 40px rgba(0,0,0,0.55);
   overflow: hidden;
+  transform: translateY(14px) scale(0.97);
+  transition: transform 0.22s cubic-bezier(0.34, 1.3, 0.64, 1), opacity 0.18s;
+  opacity: 0;
+}
+#settings-overlay.visible #settings-panel {
+  transform: translateY(0) scale(1);
+  opacity: 1;
 }
 
 #settings-header {
