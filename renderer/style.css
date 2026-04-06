@@ -1,0 +1,158 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --accent: #34d399;
+  --accent2: #10b981;
+  --glass-bg: rgba(20, 20, 35, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --text: #e8e8f0;
+  --text-muted: rgba(255, 255, 255, 0.45);
+}
+
+html, body {
+  width: 100%; height: 100%;
+  background: linear-gradient(135deg, #0f0c29, #1a1a2e, #16213e);
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+
+#video {
+  flex: 1;
+  width: 100%;
+  background: #000;
+  display: block;
+  min-height: 0;
+}
+
+#drop-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(52, 211, 153, 0.15);
+  border: 3px dashed var(--accent);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+#drop-overlay.active { display: flex; }
+#drop-message { font-size: 24px; color: var(--accent); font-weight: 600; }
+
+#controls {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid var(--glass-border);
+  flex-shrink: 0;
+}
+
+#title-bar {
+  padding: 8px 16px 2px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+#filename { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
+#time-display { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+#progress-wrap { padding: 6px 16px; cursor: pointer; }
+#progress-track {
+  background: rgba(255,255,255,0.12);
+  border-radius: 4px; height: 4px; position: relative;
+}
+#progress-fill {
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  width: 0%; height: 100%; border-radius: 4px;
+  transition: width 0.1s linear;
+}
+#progress-thumb {
+  position: absolute; left: 0; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 13px; height: 13px;
+  background: #fff; border-radius: 50%;
+  box-shadow: 0 0 6px rgba(52, 211, 153, 0.8);
+  transition: left 0.1s linear;
+}
+
+#btn-row {
+  padding: 8px 16px 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+#spacer { flex: 1; }
+
+.btn {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px; color: var(--text);
+  cursor: pointer; font-size: 13px;
+  padding: 6px 12px;
+  display: flex; align-items: center; gap: 5px;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.btn:hover { background: rgba(255,255,255,0.14); }
+
+.btn-play {
+  font-size: 16px; padding: 6px 14px;
+  background: rgba(52,211,153,0.15);
+  border-color: rgba(52,211,153,0.4);
+}
+.btn-play:hover { background: rgba(52,211,153,0.25); }
+
+.btn-jump svg { flex-shrink: 0; }
+
+.btn-speed {
+  background: rgba(52,211,153,0.12);
+  border-color: rgba(52,211,153,0.35);
+  color: var(--accent);
+  font-weight: 600;
+}
+.btn-speed:hover { background: rgba(52,211,153,0.2); }
+
+#volume-wrap {
+  display: flex; align-items: center; gap: 7px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px; padding: 6px 12px;
+}
+#vol-icon { font-size: 15px; cursor: pointer; user-select: none; }
+#vol-track {
+  background: rgba(255,255,255,0.15);
+  border-radius: 4px; height: 6px; width: 90px;
+  position: relative; cursor: pointer;
+}
+#vol-fill {
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  height: 100%; border-radius: 4px;
+}
+#vol-thumb {
+  position: absolute; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 14px; height: 14px;
+  background: #fff; border-radius: 50%;
+  box-shadow: 0 0 5px rgba(52,211,153,0.7);
+  cursor: grab;
+}
+#vol-label { font-size: 12px; color: var(--text-muted); min-width: 32px; font-variant-numeric: tabular-nums; }
+
+#speed-wrap { position: relative; }
+#speed-dropdown {
+  position: absolute; bottom: calc(100% + 6px); right: 0;
+  background: rgba(20, 20, 38, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px; min-width: 90px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  z-index: 10;
+}
+#speed-dropdown.hidden { display: none; }
+.speed-item {
+  padding: 9px 16px; font-size: 13px;
+  color: rgba(255,255,255,0.6); cursor: pointer;
+}
+.speed-item:hover { background: rgba(255,255,255,0.07); }
+.speed-item.active { color: var(--accent); background: rgba(52,211,153,0.12); font-weight: 600; }
