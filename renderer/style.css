@@ -393,8 +393,17 @@ body.vol-compact #vol-icon:hover { background: var(--btn-bg); }
   overflow: hidden;
   box-shadow: 0 4px 24px rgba(0,0,0,0.4);
   z-index: 10;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transform-origin: bottom right;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  pointer-events: auto;
 }
-#speed-dropdown.hidden { display: none; }
+#speed-dropdown.hidden {
+  opacity: 0;
+  transform: translateY(5px) scale(0.95);
+  pointer-events: none;
+}
 .speed-item {
   padding: 8px 14px; font-size: 13px;
   color: rgba(255,255,255,0.55); cursor: pointer;

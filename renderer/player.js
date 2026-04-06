@@ -79,11 +79,21 @@ video.addEventListener('play',  updatePlayButton)
 video.addEventListener('pause', updatePlayButton)
 video.addEventListener('ended', updatePlayButton)
 
-// ── Loading indicator ──────────────────────────────────────────
-video.addEventListener('waiting',   () => loadingOverlay.classList.remove('hidden'))
-video.addEventListener('playing',   () => loadingOverlay.classList.add('hidden'))
-video.addEventListener('canplay',   () => loadingOverlay.classList.add('hidden'))
-video.addEventListener('loadstart', () => loadingOverlay.classList.remove('hidden'))
+// ── Loading indicator (debounced to avoid flicker on fast seeks) ──
+let loadingTimer = null
+function showLoading()  {
+  clearTimeout(loadingTimer)
+  loadingTimer = setTimeout(() => loadingOverlay.classList.remove('hidden'), 160)
+}
+function hideLoading()  {
+  clearTimeout(loadingTimer)
+  loadingOverlay.classList.add('hidden')
+}
+video.addEventListener('waiting',   showLoading)
+video.addEventListener('loadstart', showLoading)
+video.addEventListener('playing',   hideLoading)
+video.addEventListener('canplay',   hideLoading)
+video.addEventListener('seeked',    hideLoading)
 
 // ── Video error ────────────────────────────────────────────────
 video.addEventListener('error', () => {
@@ -259,13 +269,22 @@ volIcon.addEventListener('click', (e) => {
   }
 })
 
-// Compact mode detection
-function updateVolCompact() {
-  const compact = window.innerWidth < 820
+// Compact mode — use ResizeObserver on controls-right with hysteresis to
+// avoid oscillation (compact ON < 260px, OFF only when > 310px).
+let volIsCompact = false
+const controlsRight = document.getElementById('controls-right')
+
+function applyVolCompact(compact) {
+  volIsCompact = compact
   document.body.classList.toggle('vol-compact', compact)
   if (!compact) volPopup.classList.add('hidden')
 }
-window.addEventListener('resize', updateVolCompact)
+
+const volResizeObserver = new ResizeObserver(() => {
+  const w = controlsRight.offsetWidth
+  if (!volIsCompact && w < 260) applyVolCompact(true)
+  else if (volIsCompact && w > 310) applyVolCompact(false)
+})
 
 // ── Fullscreen ─────────────────────────────────────────────────
 function showControls() {
@@ -624,7 +643,9 @@ async function init() {
 
   video.playbackRate = currentSpeed
   btnSpeed.textContent = currentSpeed + 'x \u25BE'
-  updateVolCompact()
+  volResizeObserver.observe(controlsRight)
+  // Trigger initial check
+  applyVolCompact(controlsRight.offsetWidth < 260)
 
   try {
     const ver = await window.electronAPI.getVersion()
