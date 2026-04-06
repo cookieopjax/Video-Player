@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, clipboard, nativeImage } = require('electron')
 const path = require('path')
 const fs = require('fs')
 
@@ -47,3 +47,13 @@ ipcMain.handle('open-file', async () => {
 ipcMain.handle('win-minimize', () => mainWin.minimize())
 ipcMain.handle('win-maximize', () => { mainWin.isMaximized() ? mainWin.unmaximize() : mainWin.maximize() })
 ipcMain.handle('win-close',    () => mainWin.close())
+
+ipcMain.handle('copy-image', (event, bytes) => {
+  const img = nativeImage.createFromBuffer(Buffer.from(bytes))
+  clipboard.writeImage(img)
+})
+
+ipcMain.handle('save-config', (event, newConfig) => {
+  const configPath = path.join(__dirname, 'config.json')
+  fs.writeFileSync(configPath, JSON.stringify(newConfig, null, 2))
+})

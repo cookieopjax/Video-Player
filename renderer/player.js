@@ -22,6 +22,14 @@ const volFill        = document.getElementById('vol-fill')
 const volThumb       = document.getElementById('vol-thumb')
 const volLabel       = document.getElementById('vol-label')
 const volIcon        = document.getElementById('vol-icon')
+const cropCanvas     = document.getElementById('crop-canvas')
+const settingsOverlay = document.getElementById('settings-overlay')
+const speedChips     = document.getElementById('speed-chips')
+const speedInput     = document.getElementById('speed-input')
+const jumpInput      = document.getElementById('jump-input')
+const volDefaultInput = document.getElementById('vol-default-input')
+const volDefaultLabel = document.getElementById('vol-default-label')
+const toastEl        = document.getElementById('toast')
 
 // ── State ──────────────────────────────────────────────────────
 let config             = { speeds: [0.5, 1.0, 1.5, 2.0], jumpSeconds: 10, defaultVolume: 70 }
@@ -164,6 +172,10 @@ document.addEventListener('keydown', (e) => {
       e.preventDefault()
       toggleFullscreen()
       break
+    case 'KeyS':
+      e.preventDefault()
+      startCrop()
+      break
   }
 })
 
@@ -259,6 +271,148 @@ document.addEventListener('drop', (e) => {
 document.getElementById('btn-minimize').addEventListener('click', () => window.electronAPI.winMinimize())
 document.getElementById('btn-maximize').addEventListener('click', () => window.electronAPI.winMaximize())
 document.getElementById('btn-close')   .addEventListener('click', () => window.electronAPI.winClose())
+
+// ── Toast ──────────────────────────────────────────────────────
+let toastTimer = null
+function showToast(msg) {
+  toastEl.textContent = msg
+  toastEl.classList.remove('hidden', 'fade-out')
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toastEl.classList.add('fade-out')
+    setTimeout(() => toastEl.classList.add('hidden'), 300)
+  }, 1800)
+}
+
+// ── Screenshot / Crop ──────────────────────────────────────────
+let cropStart = null
+let cropCtx   = null
+
+function startCrop() {
+  if (!video.src) return
+  cropCanvas.width  = cropCanvas.offsetWidth
+  cropCanvas.height = cropCanvas.offsetHeight
+  cropCtx = cropCanvas.getContext('2d')
+  cropCanvas.classList.add('active')
+  cropStart = null
+}
+
+function drawCropRect(x1, y1, x2, y2) {
+  cropCtx.clearRect(0, 0, cropCanvas.width, cropCanvas.height)
+  cropCtx.fillStyle = 'rgba(0,0,0,0.42)'
+  cropCtx.fillRect(0, 0, cropCanvas.width, cropCanvas.height)
+  const rx = Math.min(x1, x2), ry = Math.min(y1, y2)
+  const rw = Math.abs(x2 - x1), rh = Math.abs(y2 - y1)
+  cropCtx.clearRect(rx, ry, rw, rh)
+  cropCtx.strokeStyle = 'rgba(255,255,255,0.8)'
+  cropCtx.lineWidth = 1
+  cropCtx.strokeRect(rx, ry, rw, rh)
+}
+
+async function finalizeCrop(x1, y1, x2, y2) {
+  cropCanvas.classList.remove('active')
+  const rx = Math.min(x1, x2), ry = Math.min(y1, y2)
+  const rw = Math.abs(x2 - x1), rh = Math.abs(y2 - y1)
+  if (rw < 4 || rh < 4) return
+
+  const scaleX = video.videoWidth  / cropCanvas.width
+  const scaleY = video.videoHeight / cropCanvas.height
+  const sx = rx * scaleX, sy = ry * scaleY
+  const sw = rw * scaleX, sh = rh * scaleY
+
+  const offscreen = document.createElement('canvas')
+  offscreen.width = sw; offscreen.height = sh
+  offscreen.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh)
+  offscreen.toBlob(async (blob) => {
+    const buf = await blob.arrayBuffer()
+    await window.electronAPI.copyImage(new Uint8Array(buf))
+    showToast('已複製到剪貼簿')
+  }, 'image/png')
+}
+
+cropCanvas.addEventListener('mousedown', (e) => {
+  cropStart = { x: e.offsetX, y: e.offsetY }
+})
+cropCanvas.addEventListener('mousemove', (e) => {
+  if (!cropStart) return
+  drawCropRect(cropStart.x, cropStart.y, e.offsetX, e.offsetY)
+})
+cropCanvas.addEventListener('mouseup', (e) => {
+  if (!cropStart) return
+  finalizeCrop(cropStart.x, cropStart.y, e.offsetX, e.offsetY)
+  cropStart = null
+})
+cropCanvas.addEventListener('keydown', (e) => {
+  if (e.code === 'Escape') { cropCanvas.classList.remove('active'); cropStart = null }
+})
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Escape' && cropCanvas.classList.contains('active')) {
+    cropCanvas.classList.remove('active'); cropStart = null
+  }
+})
+
+document.getElementById('btn-screenshot').addEventListener('click', startCrop)
+
+// ── Settings panel ─────────────────────────────────────────────
+let editSpeeds = []
+
+function buildSpeedChips() {
+  speedChips.innerHTML = ''
+  editSpeeds.forEach((s, i) => {
+    const chip = document.createElement('div')
+    chip.className = 'speed-chip'
+    chip.innerHTML = `<span>${s}x</span><button class="speed-chip-remove" data-i="${i}">×</button>`
+    chip.querySelector('.speed-chip-remove').addEventListener('click', () => {
+      editSpeeds.splice(i, 1)
+      buildSpeedChips()
+    })
+    speedChips.appendChild(chip)
+  })
+}
+
+function openSettings() {
+  editSpeeds = [...config.speeds]
+  buildSpeedChips()
+  jumpInput.value = config.jumpSeconds
+  volDefaultInput.value = config.defaultVolume
+  volDefaultLabel.textContent = config.defaultVolume + '%'
+  settingsOverlay.classList.remove('hidden')
+}
+
+document.getElementById('btn-settings').addEventListener('click', openSettings)
+document.getElementById('btn-settings-close').addEventListener('click', () => settingsOverlay.classList.add('hidden'))
+settingsOverlay.addEventListener('click', (e) => { if (e.target === settingsOverlay) settingsOverlay.classList.add('hidden') })
+
+volDefaultInput.addEventListener('input', () => {
+  volDefaultLabel.textContent = volDefaultInput.value + '%'
+})
+
+document.getElementById('btn-add-speed').addEventListener('click', () => {
+  const v = parseFloat(speedInput.value)
+  if (!v || v <= 0 || editSpeeds.includes(v)) return
+  editSpeeds.push(v)
+  editSpeeds.sort((a, b) => a - b)
+  buildSpeedChips()
+  speedInput.value = ''
+})
+speedInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('btn-add-speed').click()
+})
+
+document.getElementById('btn-settings-save').addEventListener('click', async () => {
+  if (!editSpeeds.length) return
+  const newConfig = {
+    speeds:        editSpeeds,
+    jumpSeconds:   parseInt(jumpInput.value) || 10,
+    defaultVolume: parseInt(volDefaultInput.value),
+  }
+  await window.electronAPI.saveConfig(newConfig)
+  config = newConfig
+  buildSpeedMenu()
+  updateJumpLabels()
+  settingsOverlay.classList.add('hidden')
+  showToast('設定已儲存')
+})
 
 // ── Init ───────────────────────────────────────────────────────
 async function init() {
