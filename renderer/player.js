@@ -3,6 +3,8 @@ const video          = document.getElementById('video')
 const btnPlayPause   = document.getElementById('btn-playpause')
 const iconPlay       = document.getElementById('icon-play')
 const iconPause      = document.getElementById('icon-pause')
+const animEl         = document.getElementById('playpause-anim')
+const animSvg        = document.getElementById('anim-svg')
 const progressTrack  = document.getElementById('progress-track')
 const progressFill   = document.getElementById('progress-fill')
 const progressThumb  = document.getElementById('progress-thumb')
@@ -10,6 +12,7 @@ const timeDisplay    = document.getElementById('time-display')
 const filenameEl     = document.getElementById('filename')
 const dropOverlay    = document.getElementById('drop-overlay')
 const loadingOverlay = document.getElementById('loading-overlay')
+const controls       = document.getElementById('controls')
 const btnSpeed       = document.getElementById('btn-speed')
 const speedDropdown  = document.getElementById('speed-dropdown')
 const labelBackward  = document.getElementById('label-backward')
@@ -27,8 +30,20 @@ let isDraggingVolume   = false
 let currentSpeed       = 1.0
 let currentFilePath    = ''
 let saveTimer          = null
+let fsHideTimer        = null
 
-// ── Play / Pause (SVG icons) ───────────────────────────────────
+// ── Play/pause animation ───────────────────────────────────────
+const SVG_PLAY  = '<polygon points="5,3 19,12 5,21" fill="white"/>'
+const SVG_PAUSE = '<rect x="6" y="4" width="4" height="16" fill="white"/><rect x="14" y="4" width="4" height="16" fill="white"/>'
+
+function triggerPlayAnim(willBePaused) {
+  animSvg.innerHTML = willBePaused ? SVG_PLAY : SVG_PAUSE
+  animEl.classList.remove('pop')
+  void animEl.offsetWidth        // force reflow to restart animation
+  animEl.classList.add('pop')
+}
+
+// ── Play / Pause ───────────────────────────────────────────────
 function updatePlayButton() {
   const paused = video.paused || video.ended
   iconPlay.style.display  = paused  ? '' : 'none'
@@ -36,7 +51,10 @@ function updatePlayButton() {
 }
 
 function togglePlay() {
-  if (video.src) video.paused ? video.play() : video.pause()
+  if (!video.src) return
+  const willPause = !video.paused
+  triggerPlayAnim(willPause)
+  willPause ? video.pause() : video.play()
 }
 
 btnPlayPause.addEventListener('click', togglePlay)
@@ -51,7 +69,7 @@ video.addEventListener('playing',   () => loadingOverlay.classList.add('hidden')
 video.addEventListener('canplay',   () => loadingOverlay.classList.add('hidden'))
 video.addEventListener('loadstart', () => loadingOverlay.classList.remove('hidden'))
 
-// ── Progress bar (no CSS transition = no drag lag) ─────────────
+// ── Progress bar ───────────────────────────────────────────────
 function setProgress(pct) {
   progressFill.style.width = pct + '%'
   progressThumb.style.left = pct + '%'
@@ -65,7 +83,6 @@ function updateProgress() {
 
 video.addEventListener('timeupdate', () => {
   updateProgress()
-  // Save position every ~4 seconds
   if (!currentFilePath || !video.duration) return
   clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
@@ -76,11 +93,8 @@ video.addEventListener('timeupdate', () => {
 video.addEventListener('loadedmetadata', () => {
   timeDisplay.textContent = `00:00 / ${formatTime(video.duration)}`
   setProgress(0)
-  // Restore saved position
   const saved = parseFloat(localStorage.getItem('pos:' + currentFilePath))
-  if (saved > 0 && saved < video.duration - 2) {
-    video.currentTime = saved
-  }
+  if (saved > 0 && saved < video.duration - 2) video.currentTime = saved
 })
 
 function seekFromEvent(e) {
@@ -92,10 +106,7 @@ function seekFromEvent(e) {
   timeDisplay.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`
 }
 
-progressTrack.addEventListener('mousedown', (e) => {
-  isDraggingProgress = true
-  seekFromEvent(e)
-})
+progressTrack.addEventListener('mousedown', (e) => { isDraggingProgress = true; seekFromEvent(e) })
 document.addEventListener('mousemove', (e) => { if (isDraggingProgress) seekFromEvent(e) })
 document.addEventListener('mouseup',   ()  => { isDraggingProgress = false })
 
@@ -118,10 +129,7 @@ function buildSpeedMenu() {
   })
 }
 
-btnSpeed.addEventListener('click', (e) => {
-  e.stopPropagation()
-  speedDropdown.classList.toggle('hidden')
-})
+btnSpeed.addEventListener('click', (e) => { e.stopPropagation(); speedDropdown.classList.toggle('hidden') })
 document.addEventListener('click', () => speedDropdown.classList.add('hidden'))
 
 // ── Jump buttons + keyboard ────────────────────────────────────
@@ -138,20 +146,23 @@ document.getElementById('btn-forward').addEventListener('click', () => {
 })
 
 document.addEventListener('keydown', (e) => {
-  if (!video.src) return
   if (e.target.tagName === 'INPUT') return
   switch (e.code) {
     case 'Space':
       e.preventDefault()
-      video.paused ? video.play() : video.pause()
+      if (video.src) togglePlay()
       break
     case 'ArrowLeft':
       e.preventDefault()
-      video.currentTime = clamp(video.currentTime - config.jumpSeconds, 0, video.duration)
+      if (video.src) video.currentTime = clamp(video.currentTime - config.jumpSeconds, 0, video.duration)
       break
     case 'ArrowRight':
       e.preventDefault()
-      video.currentTime = clamp(video.currentTime + config.jumpSeconds, 0, video.duration)
+      if (video.src) video.currentTime = clamp(video.currentTime + config.jumpSeconds, 0, video.duration)
+      break
+    case 'KeyF':
+      e.preventDefault()
+      toggleFullscreen()
       break
   }
 })
@@ -171,10 +182,7 @@ function volumeFromEvent(e) {
   setVolume((e.clientX - rect.left) / rect.width)
 }
 
-volTrack.addEventListener('mousedown', (e) => {
-  isDraggingVolume = true
-  volumeFromEvent(e)
-})
+volTrack.addEventListener('mousedown', (e) => { isDraggingVolume = true; volumeFromEvent(e) })
 document.addEventListener('mousemove', (e) => { if (isDraggingVolume) volumeFromEvent(e) })
 document.addEventListener('mouseup',   ()  => { isDraggingVolume = false })
 
@@ -188,14 +196,40 @@ volIcon.addEventListener('click', () => {
   volIcon.textContent = video.muted ? '\uD83D\uDD07' : '\uD83D\uDD0A'
 })
 
+// ── Fullscreen ─────────────────────────────────────────────────
+function showControls() {
+  controls.classList.add('controls-visible')
+  clearTimeout(fsHideTimer)
+  fsHideTimer = setTimeout(() => controls.classList.remove('controls-visible'), 3000)
+}
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen()
+  } else {
+    document.exitFullscreen()
+  }
+}
+
+document.addEventListener('fullscreenchange', () => {
+  const isFs = !!document.fullscreenElement
+  document.body.classList.toggle('fullscreen', isFs)
+  if (isFs) showControls()
+  else controls.classList.remove('controls-visible')
+})
+
+document.addEventListener('mousemove', () => {
+  if (document.body.classList.contains('fullscreen')) showControls()
+})
+
+video.addEventListener('dblclick', toggleFullscreen)
+document.getElementById('btn-fullscreen').addEventListener('click', toggleFullscreen)
+
 // ── File opening ───────────────────────────────────────────────
 function formatPath(filePath) {
-  // Show: folder/filename.ext
   const parts = filePath.replace(/\\/g, '/').split('/')
   if (parts.length >= 2) {
-    const folder = parts[parts.length - 2]
-    const file   = parts[parts.length - 1]
-    return `<span>${folder}/</span><strong>${file}</strong>`
+    return `<span>${parts[parts.length - 2]}/</span><strong>${parts[parts.length - 1]}</strong>`
   }
   return `<strong>${parts[parts.length - 1]}</strong>`
 }
@@ -212,13 +246,8 @@ document.getElementById('btn-open').addEventListener('click', async () => {
   if (filePath) loadFile(filePath)
 })
 
-document.addEventListener('dragover', (e) => {
-  e.preventDefault()
-  dropOverlay.classList.add('active')
-})
-document.addEventListener('dragleave', (e) => {
-  if (!e.relatedTarget) dropOverlay.classList.remove('active')
-})
+document.addEventListener('dragover', (e) => { e.preventDefault(); dropOverlay.classList.add('active') })
+document.addEventListener('dragleave', (e) => { if (!e.relatedTarget) dropOverlay.classList.remove('active') })
 document.addEventListener('drop', (e) => {
   e.preventDefault()
   dropOverlay.classList.remove('active')

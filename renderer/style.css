@@ -7,11 +7,12 @@
   --glass-border: rgba(255, 255, 255, 0.1);
   --text: #e8e8f0;
   --text-muted: rgba(255, 255, 255, 0.45);
+  --titlebar-h: 34px;
 }
 
 html, body {
   width: 100%; height: 100%;
-  background: linear-gradient(135deg, #0f0c29, #1a1a2e, #16213e);
+  background: #000;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: var(--text);
@@ -22,7 +23,7 @@ html, body {
 /* ── Custom title bar ──────────────────────────────────────── */
 #app-titlebar {
   -webkit-app-region: drag;
-  height: 34px;
+  height: var(--titlebar-h);
   background: rgba(8, 6, 20, 0.92);
   border-bottom: 1px solid rgba(255,255,255,0.06);
   display: flex;
@@ -31,59 +32,95 @@ html, body {
   padding: 0 8px 0 14px;
   flex-shrink: 0;
   user-select: none;
+  transition: opacity 0.3s;
 }
+body.fullscreen #app-titlebar {
+  display: none;
+}
+
 #app-titlebar-left {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: rgba(255,255,255,0.5);
-  letter-spacing: 0.5px;
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 0.4px;
 }
+
+/* Window control buttons — uniform SVG-based icons */
 #win-controls {
   -webkit-app-region: no-drag;
   display: flex;
-  gap: 6px;
+  align-items: center;
+  gap: 4px;
 }
 #win-controls button {
-  width: 28px; height: 22px;
-  border: none; border-radius: 5px;
-  font-size: 12px; line-height: 1;
+  width: 28px; height: 28px;
+  border: none; border-radius: 6px;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   background: rgba(255,255,255,0.07);
-  color: rgba(255,255,255,0.55);
+  color: rgba(255,255,255,0.5);
   transition: background 0.15s, color 0.15s;
+  padding: 0;
 }
-#btn-close:hover    { background: #e74c3c; color: #fff; }
-#btn-maximize:hover { background: rgba(255,255,255,0.15); color: #fff; }
-#btn-minimize:hover { background: rgba(255,255,255,0.15); color: #fff; }
+#btn-close:hover    { background: #c0392b; color: #fff; }
+#btn-maximize:hover { background: rgba(255,255,255,0.14); color: #fff; }
+#btn-minimize:hover { background: rgba(255,255,255,0.14); color: #fff; }
 
-/* ── Video ─────────────────────────────────────────────────── */
-#video {
+/* ── Video container ───────────────────────────────────────── */
+#video-container {
   flex: 1;
-  width: 100%;
+  position: relative;
   background: #000;
-  display: block;
   min-height: 0;
+  overflow: hidden;
+}
+
+#video {
+  width: 100%; height: 100%;
+  display: block;
   cursor: pointer;
+}
+
+/* ── Play/pause flash animation ────────────────────────────── */
+#playpause-anim {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%) scale(0.8);
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.52);
+  backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 20;
+}
+#playpause-anim.pop {
+  animation: pp-pop 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+@keyframes pp-pop {
+  0%   { opacity: 0.95; transform: translate(-50%, -50%) scale(0.75); }
+  35%  { opacity: 0.95; transform: translate(-50%, -50%) scale(1.05); }
+  100% { opacity: 0;    transform: translate(-50%, -50%) scale(1.25); }
 }
 
 /* ── Loading spinner ───────────────────────────────────────── */
 #loading-overlay {
   position: absolute;
-  inset: 34px 0 0 0;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0,0,0,0.45);
-  z-index: 50;
+  background: rgba(0,0,0,0.35);
+  z-index: 15;
   pointer-events: none;
 }
 #loading-overlay.hidden { display: none; }
 .spinner {
   width: 40px; height: 40px;
-  border: 3px solid rgba(52,211,153,0.25);
+  border: 3px solid rgba(52,211,153,0.2);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -112,9 +149,28 @@ html, body {
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-top: 1px solid var(--glass-border);
   flex-shrink: 0;
+  transition: opacity 0.3s, transform 0.3s;
 }
 
-/* ── Info bar (path + time) ────────────────────────────────── */
+/* Fullscreen: controls float over video, auto-hide */
+body.fullscreen #controls {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+body.fullscreen #controls.controls-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+body.fullscreen #video-container {
+  flex: 1;
+}
+
+/* ── Info bar ──────────────────────────────────────────────── */
 #title-bar {
   padding: 8px 16px 2px;
   display: flex;
@@ -124,20 +180,16 @@ html, body {
 }
 #filename {
   font-size: 12px;
-  font-weight: 400;
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
 }
-#filename strong {
-  color: var(--text);
-  font-weight: 500;
-}
+#filename strong { color: var(--text); font-weight: 500; }
 #time-display { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
 
-/* ── Progress bar (no transitions — prevents drag lag) ─────── */
+/* ── Progress bar ──────────────────────────────────────────── */
 #progress-wrap { padding: 12px 16px; cursor: pointer; }
 #progress-track {
   background: rgba(255,255,255,0.12);
@@ -155,7 +207,7 @@ html, body {
   box-shadow: 0 0 6px rgba(52, 211, 153, 0.8);
 }
 
-/* ── Button row (3-column: left | center | right) ──────────── */
+/* ── Button row ────────────────────────────────────────────── */
 #btn-row {
   padding: 8px 16px 12px;
   display: flex; align-items: center;
@@ -191,7 +243,6 @@ html, body {
   border-color: rgba(52,211,153,0.4);
 }
 .btn-play:hover { background: rgba(52,211,153,0.25); }
-
 .btn-jump svg { flex-shrink: 0; }
 
 .btn-speed {
@@ -242,9 +293,6 @@ html, body {
   z-index: 10;
 }
 #speed-dropdown.hidden { display: none; }
-.speed-item {
-  padding: 9px 16px; font-size: 13px;
-  color: rgba(255,255,255,0.6); cursor: pointer;
-}
+.speed-item { padding: 9px 16px; font-size: 13px; color: rgba(255,255,255,0.6); cursor: pointer; }
 .speed-item:hover { background: rgba(255,255,255,0.07); }
 .speed-item.active { color: var(--accent); background: rgba(52,211,153,0.12); font-weight: 600; }
