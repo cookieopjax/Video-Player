@@ -7,7 +7,65 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <p style="color:white;padding:20px">Scaffold OK</p>
+
+  <div id="drop-overlay">
+    <div id="drop-message">拖拉影片到這裡</div>
+  </div>
+
+  <video id="video"></video>
+
+  <div id="controls">
+
+    <div id="title-bar">
+      <span id="filename">尚未開啟影片</span>
+      <span id="time-display">00:00 / 00:00</span>
+    </div>
+
+    <div id="progress-wrap">
+      <div id="progress-track">
+        <div id="progress-fill"></div>
+        <div id="progress-thumb"></div>
+      </div>
+    </div>
+
+    <div id="btn-row">
+
+      <button id="btn-open" class="btn" title="開啟檔案">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      </button>
+
+      <button id="btn-playpause" class="btn btn-play" title="播放/暫停 (Space)">&#9654;</button>
+
+      <button id="btn-backward" class="btn btn-jump" title="後退 (←)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+        <span id="label-backward">10s</span>
+      </button>
+
+      <button id="btn-forward" class="btn btn-jump" title="前進 (→)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.5"/></svg>
+        <span id="label-forward">10s</span>
+      </button>
+
+      <div id="spacer"></div>
+
+      <div id="volume-wrap">
+        <span id="vol-icon">&#128266;</span>
+        <div id="vol-track">
+          <div id="vol-fill"></div>
+          <div id="vol-thumb"></div>
+        </div>
+        <span id="vol-label">70%</span>
+      </div>
+
+      <div id="speed-wrap">
+        <button id="btn-speed" class="btn btn-speed">1.0x &#9662;</button>
+        <div id="speed-dropdown" class="hidden"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="utils.js"></script>
   <script src="player.js"></script>
 </body>
 </html>
