@@ -20,16 +20,16 @@ html, body {
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
   color: var(--text);
-  display: flex;
-  flex-direction: column;
   -webkit-font-smoothing: antialiased;
 }
+body { position: relative; }
 
 /* ── Custom title bar ──────────────────────────────────────── */
 #app-titlebar {
   -webkit-app-region: drag;
+  position: absolute; top: 0; left: 0; right: 0; z-index: 10;
   height: var(--titlebar-h);
-  background: rgba(20, 20, 22, 0.6);
+  background: rgba(20, 20, 22, 0.5);
   backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
   border-bottom: 1px solid var(--glass-border);
@@ -37,7 +37,6 @@ html, body {
   align-items: center;
   justify-content: space-between;
   padding: 0 8px 0 14px;
-  flex-shrink: 0;
   user-select: none;
   transition: opacity 0.25s;
 }
@@ -75,10 +74,9 @@ body.fullscreen #app-titlebar { display: none; }
 
 /* ── Video container ───────────────────────────────────────── */
 #video-container {
-  flex: 1;
-  position: relative;
+  position: absolute;
+  inset: 0;
   background: #000;
-  min-height: 0;
   overflow: hidden;
 }
 #video {
@@ -141,15 +139,15 @@ body.fullscreen #app-titlebar { display: none; }
 
 /* ── Controls panel ────────────────────────────────────────── */
 #controls {
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 10;
   background: var(--glass-bg);
   backdrop-filter: blur(48px) saturate(160%);
   -webkit-backdrop-filter: blur(48px) saturate(160%);
   border-top: 1px solid var(--glass-border);
-  flex-shrink: 0;
   transition: opacity 0.25s, transform 0.25s;
 }
 body.fullscreen #controls {
-  position: fixed; bottom: 0; left: 0; right: 0;
+  position: fixed;
   opacity: 0; transform: translateY(6px);
   pointer-events: none;
 }
@@ -170,21 +168,30 @@ body.fullscreen #controls.controls-visible {
 }
 #filename strong { color: var(--text); font-weight: 500; }
 #time-display {
-  font-size: 12px; color: var(--text-muted);
+  font-size: 12px; color: var(--text);
   font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0;
   font-feature-settings: "tnum";
 }
 
 /* ── Progress bar ──────────────────────────────────────────── */
-#progress-wrap { padding: 10px 16px; cursor: pointer; }
+#progress-wrap { padding: 4px 16px; cursor: pointer; }
 #progress-track {
+  height: 20px; position: relative; cursor: pointer;
+}
+#progress-track::before {
+  content: '';
+  position: absolute; left: 0; right: 0;
+  top: 50%; transform: translateY(-50%);
+  height: 3px; border-radius: 2px;
   background: var(--fill-track);
-  border-radius: 2px; height: 3px; position: relative;
+  pointer-events: none;
 }
 #progress-track:hover #progress-fill { filter: brightness(1.15); }
 #progress-fill {
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
   background: var(--fill);
-  width: 0%; height: 100%; border-radius: 2px;
+  width: 0%; height: 3px; border-radius: 2px;
+  pointer-events: none;
 }
 #progress-thumb {
   position: absolute; left: 0; top: 50%;
@@ -194,6 +201,7 @@ body.fullscreen #controls.controls-visible {
   box-shadow: 0 1px 4px rgba(0,0,0,0.5);
   opacity: 0;
   transition: opacity 0.15s;
+  pointer-events: none;
 }
 #progress-wrap:hover #progress-thumb { opacity: 1; }
 
@@ -262,11 +270,23 @@ body.fullscreen #controls.controls-visible {
 #vol-icon { font-size: 14px; cursor: pointer; user-select: none; opacity: 0.75; }
 #vol-icon:hover { opacity: 1; }
 #vol-track {
-  background: var(--fill-track);
-  border-radius: 2px; height: 3px; width: 130px;
+  width: 130px; height: 20px;
   position: relative; cursor: pointer;
 }
-#vol-fill { background: var(--fill); height: 100%; border-radius: 2px; }
+#vol-track::before {
+  content: '';
+  position: absolute; left: 0; right: 0;
+  top: 50%; transform: translateY(-50%);
+  height: 3px; border-radius: 2px;
+  background: var(--fill-track);
+  pointer-events: none;
+}
+#vol-fill {
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  height: 3px; border-radius: 2px;
+  background: var(--fill);
+  pointer-events: none;
+}
 #vol-thumb {
   position: absolute; top: 50%;
   transform: translate(-50%, -50%);
@@ -274,6 +294,7 @@ body.fullscreen #controls.controls-visible {
   background: #fff; border-radius: 50%;
   box-shadow: 0 1px 4px rgba(0,0,0,0.4);
   cursor: grab;
+  pointer-events: none;
 }
 #vol-label { font-size: 11px; color: var(--text-muted); min-width: 30px; font-variant-numeric: tabular-nums; text-align: right; }
 

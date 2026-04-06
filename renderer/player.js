@@ -5,6 +5,7 @@ const iconPlay       = document.getElementById('icon-play')
 const iconPause      = document.getElementById('icon-pause')
 const animEl         = document.getElementById('playpause-anim')
 const animSvg        = document.getElementById('anim-svg')
+const progressWrap   = document.getElementById('progress-wrap')
 const progressTrack  = document.getElementById('progress-track')
 const progressFill   = document.getElementById('progress-fill')
 const progressThumb  = document.getElementById('progress-thumb')
@@ -114,7 +115,7 @@ function seekFromEvent(e) {
   timeDisplay.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`
 }
 
-progressTrack.addEventListener('mousedown', (e) => { isDraggingProgress = true; seekFromEvent(e) })
+progressWrap.addEventListener('mousedown', (e) => { isDraggingProgress = true; seekFromEvent(e) })
 document.addEventListener('mousemove', (e) => { if (isDraggingProgress) seekFromEvent(e) })
 document.addEventListener('mouseup',   ()  => { isDraggingProgress = false })
 
@@ -341,9 +342,9 @@ function canvasPosFromEvent(e) {
 
 function startCrop() {
   if (!video.src) return
-  const rect = cropCanvas.getBoundingClientRect()
-  cropCanvas.width  = rect.width
-  cropCanvas.height = rect.height
+  const container = cropCanvas.parentElement   // #video-container, always visible
+  cropCanvas.width  = container.clientWidth
+  cropCanvas.height = container.clientHeight
   cropCtx = cropCanvas.getContext('2d')
   cropCanvas.classList.add('active')
   cropStart  = null
