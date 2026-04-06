@@ -11,20 +11,24 @@ function readConfig() {
   }
 }
 
+let mainWin = null
+
 function createWindow() {
-  const win = new BrowserWindow({
+  mainWin = new BrowserWindow({
     width: 900,
     height: 600,
     minWidth: 640,
     minHeight: 400,
     backgroundColor: '#0f0c29',
+    frame: false,
+    icon: path.join(__dirname, 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
     },
   })
-  win.loadFile('renderer/index.html')
+  mainWin.loadFile('renderer/index.html')
 }
 
 app.whenReady().then(createWindow)
@@ -39,3 +43,7 @@ ipcMain.handle('open-file', async () => {
   })
   return canceled ? null : filePaths[0]
 })
+
+ipcMain.handle('win-minimize', () => mainWin.minimize())
+ipcMain.handle('win-maximize', () => { mainWin.isMaximized() ? mainWin.unmaximize() : mainWin.maximize() })
+ipcMain.handle('win-close',    () => mainWin.close())

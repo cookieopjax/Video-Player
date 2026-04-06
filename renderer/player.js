@@ -1,31 +1,36 @@
 // ── Element refs ──────────────────────────────────────────────
-const video        = document.getElementById('video')
-const btnPlayPause = document.getElementById('btn-playpause')
-const progressTrack = document.getElementById('progress-track')
-const progressFill  = document.getElementById('progress-fill')
-const progressThumb = document.getElementById('progress-thumb')
-const timeDisplay   = document.getElementById('time-display')
-const filenameEl    = document.getElementById('filename')
-const dropOverlay   = document.getElementById('drop-overlay')
-const btnSpeed      = document.getElementById('btn-speed')
-const speedDropdown = document.getElementById('speed-dropdown')
-const labelBackward = document.getElementById('label-backward')
-const labelForward  = document.getElementById('label-forward')
-const volTrack      = document.getElementById('vol-track')
-const volFill       = document.getElementById('vol-fill')
-const volThumb      = document.getElementById('vol-thumb')
-const volLabel      = document.getElementById('vol-label')
-const volIcon       = document.getElementById('vol-icon')
+const video          = document.getElementById('video')
+const btnPlayPause   = document.getElementById('btn-playpause')
+const iconPlay       = document.getElementById('icon-play')
+const iconPause      = document.getElementById('icon-pause')
+const progressTrack  = document.getElementById('progress-track')
+const progressFill   = document.getElementById('progress-fill')
+const progressThumb  = document.getElementById('progress-thumb')
+const timeDisplay    = document.getElementById('time-display')
+const filenameEl     = document.getElementById('filename')
+const dropOverlay    = document.getElementById('drop-overlay')
+const loadingOverlay = document.getElementById('loading-overlay')
+const btnSpeed       = document.getElementById('btn-speed')
+const speedDropdown  = document.getElementById('speed-dropdown')
+const labelBackward  = document.getElementById('label-backward')
+const labelForward   = document.getElementById('label-forward')
+const volTrack       = document.getElementById('vol-track')
+const volFill        = document.getElementById('vol-fill')
+const volThumb       = document.getElementById('vol-thumb')
+const volLabel       = document.getElementById('vol-label')
+const volIcon        = document.getElementById('vol-icon')
 
 // ── State ──────────────────────────────────────────────────────
-let config = { speeds: [0.5, 1.0, 1.5, 2.0], jumpSeconds: 10, defaultVolume: 70 }
+let config             = { speeds: [0.5, 1.0, 1.5, 2.0], jumpSeconds: 10, defaultVolume: 70 }
 let isDraggingProgress = false
 let isDraggingVolume   = false
 let currentSpeed       = 1.0
 
-// ── Play / Pause ───────────────────────────────────────────────
+// ── Play / Pause (SVG icons) ───────────────────────────────────
 function updatePlayButton() {
-  btnPlayPause.textContent = video.paused ? '\u25B6' : '\u23F8'
+  const paused = video.paused || video.ended
+  iconPlay.style.display  = paused  ? '' : 'none'
+  iconPause.style.display = !paused ? '' : 'none'
 }
 
 btnPlayPause.addEventListener('click', () => {
@@ -33,26 +38,39 @@ btnPlayPause.addEventListener('click', () => {
 })
 video.addEventListener('play',  updatePlayButton)
 video.addEventListener('pause', updatePlayButton)
+video.addEventListener('ended', updatePlayButton)
 
-// ── Progress bar ───────────────────────────────────────────────
-function updateProgress() {
-  if (!video.duration || isDraggingProgress) return
-  const pct = (video.currentTime / video.duration) * 100
+// ── Loading indicator ──────────────────────────────────────────
+video.addEventListener('waiting',   () => loadingOverlay.classList.remove('hidden'))
+video.addEventListener('playing',   () => loadingOverlay.classList.add('hidden'))
+video.addEventListener('canplay',   () => loadingOverlay.classList.add('hidden'))
+video.addEventListener('loadstart', () => loadingOverlay.classList.remove('hidden'))
+
+// ── Progress bar (no CSS transition = no drag lag) ─────────────
+function setProgress(pct) {
   progressFill.style.width = pct + '%'
   progressThumb.style.left = pct + '%'
+}
+
+function updateProgress() {
+  if (!video.duration || isDraggingProgress) return
+  setProgress((video.currentTime / video.duration) * 100)
   timeDisplay.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`
 }
 
 video.addEventListener('timeupdate', updateProgress)
 video.addEventListener('loadedmetadata', () => {
   timeDisplay.textContent = `00:00 / ${formatTime(video.duration)}`
-  updateProgress()
+  setProgress(0)
 })
 
 function seekFromEvent(e) {
+  if (!video.duration) return
   const rect = progressTrack.getBoundingClientRect()
   const pct  = clamp((e.clientX - rect.left) / rect.width, 0, 1)
   video.currentTime = pct * video.duration
+  setProgress(pct * 100)
+  timeDisplay.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`
 }
 
 progressTrack.addEventListener('mousedown', (e) => {
@@ -152,9 +170,20 @@ volIcon.addEventListener('click', () => {
 })
 
 // ── File opening ───────────────────────────────────────────────
+function formatPath(filePath) {
+  // Show: folder/filename.ext
+  const parts = filePath.replace(/\\/g, '/').split('/')
+  if (parts.length >= 2) {
+    const folder = parts[parts.length - 2]
+    const file   = parts[parts.length - 1]
+    return `<span>${folder}/</span><strong>${file}</strong>`
+  }
+  return `<strong>${parts[parts.length - 1]}</strong>`
+}
+
 function loadFile(filePath) {
-  video.src = 'file:///' + filePath.replace(/\\/g, '/').replace(/ /g, '%20')
-  filenameEl.textContent = '\uD83D\uDCC4 ' + filePath.split(/[\\/]/).pop()
+  video.src = 'file:///' + filePath.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/')
+  filenameEl.innerHTML = formatPath(filePath)
   video.play()
 }
 
@@ -176,6 +205,11 @@ document.addEventListener('drop', (e) => {
   const file = e.dataTransfer.files[0]
   if (file) loadFile(file.path)
 })
+
+// ── Window controls ────────────────────────────────────────────
+document.getElementById('btn-minimize').addEventListener('click', () => window.electronAPI.winMinimize())
+document.getElementById('btn-maximize').addEventListener('click', () => window.electronAPI.winMaximize())
+document.getElementById('btn-close')   .addEventListener('click', () => window.electronAPI.winClose())
 
 // ── Init ───────────────────────────────────────────────────────
 async function init() {

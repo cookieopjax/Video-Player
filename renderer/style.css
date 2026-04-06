@@ -19,6 +19,47 @@ html, body {
   flex-direction: column;
 }
 
+/* ── Custom title bar ──────────────────────────────────────── */
+#app-titlebar {
+  -webkit-app-region: drag;
+  height: 34px;
+  background: rgba(8, 6, 20, 0.92);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 0 14px;
+  flex-shrink: 0;
+  user-select: none;
+}
+#app-titlebar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+  letter-spacing: 0.5px;
+}
+#win-controls {
+  -webkit-app-region: no-drag;
+  display: flex;
+  gap: 6px;
+}
+#win-controls button {
+  width: 28px; height: 22px;
+  border: none; border-radius: 5px;
+  font-size: 12px; line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.55);
+  transition: background 0.15s, color 0.15s;
+}
+#btn-close:hover    { background: #e74c3c; color: #fff; }
+#btn-maximize:hover { background: rgba(255,255,255,0.15); color: #fff; }
+#btn-minimize:hover { background: rgba(255,255,255,0.15); color: #fff; }
+
+/* ── Video ─────────────────────────────────────────────────── */
 #video {
   flex: 1;
   width: 100%;
@@ -27,6 +68,28 @@ html, body {
   min-height: 0;
 }
 
+/* ── Loading spinner ───────────────────────────────────────── */
+#loading-overlay {
+  position: absolute;
+  inset: 34px 0 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.45);
+  z-index: 50;
+  pointer-events: none;
+}
+#loading-overlay.hidden { display: none; }
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid rgba(52,211,153,0.25);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Drop overlay ──────────────────────────────────────────── */
 #drop-overlay {
   display: none;
   position: fixed;
@@ -41,6 +104,7 @@ html, body {
 #drop-overlay.active { display: flex; }
 #drop-message { font-size: 24px; color: var(--accent); font-weight: 600; }
 
+/* ── Controls panel ────────────────────────────────────────── */
 #controls {
   background: var(--glass-bg);
   backdrop-filter: blur(20px) saturate(180%);
@@ -49,15 +113,30 @@ html, body {
   flex-shrink: 0;
 }
 
+/* ── Info bar (path + time) ────────────────────────────────── */
 #title-bar {
   padding: 8px 16px 2px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
-#filename { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
-#time-display { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+#filename {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+#filename strong {
+  color: var(--text);
+  font-weight: 500;
+}
+#time-display { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
 
+/* ── Progress bar (no transitions — prevents drag lag) ─────── */
 #progress-wrap { padding: 6px 16px; cursor: pointer; }
 #progress-track {
   background: rgba(255,255,255,0.12);
@@ -66,7 +145,6 @@ html, body {
 #progress-fill {
   background: linear-gradient(90deg, var(--accent), var(--accent2));
   width: 0%; height: 100%; border-radius: 4px;
-  transition: width 0.1s linear;
 }
 #progress-thumb {
   position: absolute; left: 0; top: 50%;
@@ -74,9 +152,9 @@ html, body {
   width: 13px; height: 13px;
   background: #fff; border-radius: 50%;
   box-shadow: 0 0 6px rgba(52, 211, 153, 0.8);
-  transition: left 0.1s linear;
 }
 
+/* ── Button row ────────────────────────────────────────────── */
 #btn-row {
   padding: 8px 16px 12px;
   display: flex; align-items: center; gap: 8px;
@@ -96,7 +174,7 @@ html, body {
 .btn:hover { background: rgba(255,255,255,0.14); }
 
 .btn-play {
-  font-size: 16px; padding: 6px 14px;
+  padding: 7px 16px;
   background: rgba(52,211,153,0.15);
   border-color: rgba(52,211,153,0.4);
 }
@@ -112,6 +190,7 @@ html, body {
 }
 .btn-speed:hover { background: rgba(52,211,153,0.2); }
 
+/* ── Volume ────────────────────────────────────────────────── */
 #volume-wrap {
   display: flex; align-items: center; gap: 7px;
   background: rgba(255,255,255,0.06);
@@ -121,7 +200,7 @@ html, body {
 #vol-icon { font-size: 15px; cursor: pointer; user-select: none; }
 #vol-track {
   background: rgba(255,255,255,0.15);
-  border-radius: 4px; height: 6px; width: 90px;
+  border-radius: 4px; height: 6px; width: 130px;
   position: relative; cursor: pointer;
 }
 #vol-fill {
@@ -138,6 +217,7 @@ html, body {
 }
 #vol-label { font-size: 12px; color: var(--text-muted); min-width: 32px; font-variant-numeric: tabular-nums; }
 
+/* ── Speed dropdown ────────────────────────────────────────── */
 #speed-wrap { position: relative; }
 #speed-dropdown {
   position: absolute; bottom: calc(100% + 6px); right: 0;
