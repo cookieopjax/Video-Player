@@ -31,7 +31,7 @@ jobs:
 
       - name: List build output
         shell: bash
-        run: find dist -maxdepth 1 -name "*.exe" | sort
+        run: find dist -maxdepth 1 \( -name "*.exe" -o -name "*.yml" \) | sort
 
       - name: Create GitHub Release
         shell: bash
@@ -40,8 +40,9 @@ jobs:
         run: |
           tag="${GITHUB_REF#refs/tags/}"
           mapfile -t exes < <(find dist -maxdepth 1 -name "*.exe" | sort)
+          mapfile -t ymls < <(find dist -maxdepth 1 -name "*.yml" | sort)
           if [ ${#exes[@]} -eq 0 ]; then echo "No exe files found"; exit 1; fi
           gh release create "$tag" \
             --title "VideoPlayer $tag" \
             --generate-notes \
-            "${exes[@]}"
+            "${exes[@]}" "${ymls[@]}"

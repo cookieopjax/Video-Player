@@ -113,4 +113,15 @@ describe('normalizeConfig', () => {
     expect(normalizeConfig({ resumeAfterCrop: 1 }).resumeAfterCrop).toBe(false)
     expect(normalizeConfig({ resumeAfterCrop: true }).resumeAfterCrop).toBe(true)
   })
+
+  test('autoCheckUpdate defaults to true', () => {
+    expect(normalizeConfig({}).autoCheckUpdate).toBe(true)
+    expect(normalizeConfig(null).autoCheckUpdate).toBe(true)
+  })
+
+  test('autoCheckUpdate is false only when explicitly false', () => {
+    expect(normalizeConfig({ autoCheckUpdate: false }).autoCheckUpdate).toBe(false)
+    expect(normalizeConfig({ autoCheckUpdate: true }).autoCheckUpdate).toBe(true)
+    expect(normalizeConfig({ autoCheckUpdate: 0 }).autoCheckUpdate).toBe(true)
+  })
 })

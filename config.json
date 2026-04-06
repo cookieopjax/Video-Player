@@ -1,13 +1,8 @@
 {
-  "speeds": [
-    0.75,
-    1,
-    1.25,
-    1.5,
-    2
-  ],
+  "speeds": [0.75, 1, 1.25, 1.5, 2],
   "jumpSeconds": 15,
   "defaultVolume": 70,
   "autoPlay": false,
-  "resumeAfterCrop": false
+  "resumeAfterCrop": false,
+  "autoCheckUpdate": true
 }

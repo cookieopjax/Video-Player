@@ -24,8 +24,9 @@ function normalizeConfig(raw) {
                       ? Math.floor(raw.jumpSeconds) : 15,
     defaultVolume:  (typeof raw?.defaultVolume === 'number' && isFinite(raw.defaultVolume))
                       ? clamp(Math.round(raw.defaultVolume), 0, 100) : 70,
-    autoPlay:       raw?.autoPlay === true,
+    autoPlay:        raw?.autoPlay === true,
     resumeAfterCrop: raw?.resumeAfterCrop === true,
+    autoCheckUpdate: raw?.autoCheckUpdate !== false,
   }
 }
 

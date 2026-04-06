@@ -517,11 +517,12 @@ let settingsOpenState = null   // JSON snapshot taken when settings opens
 
 function getSettingsFormState() {
   return JSON.stringify({
-    speeds:          [...editSpeeds],
-    jumpSeconds:     parseInt(jumpInput.value) || 10,
-    defaultVolume:   parseInt(volDefaultInput.value),
-    autoPlay:        document.getElementById('autoplay-input').checked,
-    resumeAfterCrop: document.getElementById('resume-after-crop-input').checked,
+    speeds:           [...editSpeeds],
+    jumpSeconds:      parseInt(jumpInput.value) || 10,
+    defaultVolume:    parseInt(volDefaultInput.value),
+    autoPlay:         document.getElementById('autoplay-input').checked,
+    resumeAfterCrop:  document.getElementById('resume-after-crop-input').checked,
+    autoCheckUpdate:  document.getElementById('auto-check-update-input').checked,
   })
 }
 
@@ -551,6 +552,7 @@ function openSettings() {
   volDefaultLabel.textContent = config.defaultVolume + '%'
   document.getElementById('autoplay-input').checked = config.autoPlay !== false
   document.getElementById('resume-after-crop-input').checked = !!config.resumeAfterCrop
+  document.getElementById('auto-check-update-input').checked = config.autoCheckUpdate !== false
   document.getElementById('settings-confirm').classList.add('hidden')
   settingsOpenState = getSettingsFormState()
   settingsOverlay.classList.remove('hidden')
@@ -591,11 +593,12 @@ speedInput.addEventListener('keydown', (e) => {
 async function doSaveSettings() {
   if (!editSpeeds.length) return false
   const newConfig = {
-    speeds:          editSpeeds,
-    jumpSeconds:     parseInt(jumpInput.value) || 10,
-    defaultVolume:   parseInt(volDefaultInput.value),
-    autoPlay:        document.getElementById('autoplay-input').checked,
-    resumeAfterCrop: document.getElementById('resume-after-crop-input').checked,
+    speeds:           editSpeeds,
+    jumpSeconds:      parseInt(jumpInput.value) || 10,
+    defaultVolume:    parseInt(volDefaultInput.value),
+    autoPlay:         document.getElementById('autoplay-input').checked,
+    resumeAfterCrop:  document.getElementById('resume-after-crop-input').checked,
+    autoCheckUpdate:  document.getElementById('auto-check-update-input').checked,
   }
   try {
     const result = await window.electronAPI.saveConfig(newConfig)
@@ -619,6 +622,69 @@ document.getElementById('btn-confirm-save').addEventListener('click', async () =
   if (await doSaveSettings()) closeSettings(true)
 })
 document.getElementById('btn-confirm-discard').addEventListener('click', () => closeSettings(true))
+
+// ── Auto-updater UI ────────────────────────────────────────────
+const updateStatusText    = document.getElementById('update-status-text')
+const updateProgressWrap  = document.getElementById('update-progress-wrap')
+const updateProgressFill  = document.getElementById('update-progress-fill')
+const btnCheckUpdate      = document.getElementById('btn-check-update')
+const btnDownloadUpdate   = document.getElementById('btn-download-update')
+const btnInstallUpdate    = document.getElementById('btn-install-update')
+
+function setUpdateUI(state, data = {}) {
+  updateProgressWrap.classList.add('hidden')
+  btnCheckUpdate.classList.remove('hidden')
+  btnDownloadUpdate.classList.add('hidden')
+  btnInstallUpdate.classList.add('hidden')
+  btnCheckUpdate.disabled = false
+
+  switch (state) {
+    case 'checking':
+      updateStatusText.textContent = '檢查中…'
+      btnCheckUpdate.disabled = true
+      break
+    case 'up-to-date':
+      updateStatusText.textContent = '已是最新版本 ✓'
+      break
+    case 'available':
+      updateStatusText.textContent = `發現新版本 v${data.version}`
+      btnCheckUpdate.classList.add('hidden')
+      btnDownloadUpdate.classList.remove('hidden')
+      break
+    case 'downloading':
+      updateStatusText.textContent = `下載中… ${data.percent ?? 0}%`
+      updateProgressWrap.classList.remove('hidden')
+      updateProgressFill.style.width = (data.percent ?? 0) + '%'
+      btnCheckUpdate.classList.add('hidden')
+      break
+    case 'downloaded':
+      updateStatusText.textContent = '下載完成，準備安裝'
+      updateProgressFill.style.width = '100%'
+      updateProgressWrap.classList.remove('hidden')
+      btnCheckUpdate.classList.add('hidden')
+      btnInstallUpdate.classList.remove('hidden')
+      break
+    case 'error':
+      updateStatusText.textContent = `檢查失敗：${data.message ?? ''}`
+      break
+    default:
+      updateStatusText.textContent = ''
+  }
+}
+
+btnCheckUpdate.addEventListener('click', () => {
+  setUpdateUI('checking')
+  window.electronAPI.checkUpdate()
+})
+btnDownloadUpdate.addEventListener('click', () => {
+  setUpdateUI('downloading', { percent: 0 })
+  window.electronAPI.downloadUpdate()
+})
+btnInstallUpdate.addEventListener('click', () => window.electronAPI.installUpdate())
+
+window.electronAPI.onUpdateStatus((status) => {
+  setUpdateUI(status.state, status)
+})
 
 // ── Init ───────────────────────────────────────────────────────
 async function init() {

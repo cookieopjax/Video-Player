@@ -144,6 +144,7 @@
   <!-- Settings modal -->
   <div id="settings-overlay" class="hidden">
     <div id="settings-panel">
+
       <div id="settings-header">
         <span>設定</span>
         <button id="btn-settings-close">
@@ -151,47 +152,86 @@
         </button>
       </div>
 
-      <div class="settings-section">
-        <div class="settings-label">播放速度選項</div>
-        <div id="speed-chips"></div>
-        <div class="settings-add-row">
-          <input id="speed-input" type="number" min="0.1" max="10" step="0.25" placeholder="新增速度…">
-          <button id="btn-add-speed" class="btn">新增</button>
+      <div id="settings-body">
+
+        <!-- 播放 -->
+        <div class="sg">
+          <div class="sg-title">播放</div>
+          <div class="sg-row">
+            <span class="sg-label">開啟後自動播放</span>
+            <label class="toggle">
+              <input type="checkbox" id="autoplay-input">
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+          <div class="sg-row">
+            <span class="sg-label">跳躍秒數</span>
+            <input id="jump-input" type="number" min="1" max="300" step="1" class="sg-num-input">
+          </div>
+          <div class="sg-row sg-row-col">
+            <div class="sg-row-top">
+              <span class="sg-label">預設音量</span>
+              <span id="vol-default-label" class="sg-label-val">70%</span>
+            </div>
+            <input id="vol-default-input" type="range" min="0" max="100" step="1" class="sg-range">
+          </div>
         </div>
-      </div>
 
-      <div class="settings-section">
-        <div class="settings-label">跳躍秒數</div>
-        <input id="jump-input" type="number" min="1" max="300" step="1" class="settings-text-input">
-      </div>
+        <!-- 播放速度 -->
+        <div class="sg">
+          <div class="sg-title">播放速度</div>
+          <div class="sg-pad">
+            <div id="speed-chips"></div>
+            <div class="sg-add-row">
+              <input id="speed-input" type="number" min="0.1" max="10" step="0.25" placeholder="新增…">
+              <button id="btn-add-speed" class="btn">＋ 新增</button>
+            </div>
+          </div>
+        </div>
 
-      <div class="settings-section">
-        <div class="settings-label">預設音量 <span id="vol-default-label">70%</span></div>
-        <input id="vol-default-input" type="range" min="0" max="100" step="1" class="settings-range">
-      </div>
+        <!-- 截圖 -->
+        <div class="sg">
+          <div class="sg-title">截圖</div>
+          <div class="sg-row">
+            <span class="sg-label">截圖後繼續播放</span>
+            <label class="toggle">
+              <input type="checkbox" id="resume-after-crop-input">
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+        </div>
 
-      <div class="settings-section settings-row">
-        <span class="settings-row-label">開啟影片後自動播放</span>
-        <label class="toggle">
-          <input type="checkbox" id="autoplay-input">
-          <span class="toggle-track"><span class="toggle-thumb"></span></span>
-        </label>
-      </div>
+        <!-- 更新 -->
+        <div class="sg">
+          <div class="sg-title">更新</div>
+          <div class="sg-row">
+            <span class="sg-label">自動檢查更新</span>
+            <label class="toggle">
+              <input type="checkbox" id="auto-check-update-input">
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+          <div class="sg-pad" id="update-area">
+            <div id="update-status-text" class="update-status-text"></div>
+            <div id="update-progress-wrap" class="hidden">
+              <div id="update-progress-fill"></div>
+            </div>
+            <div id="update-actions">
+              <button id="btn-check-update" class="btn btn-sm">立即檢查</button>
+              <button id="btn-download-update" class="btn btn-sm btn-accent hidden">下載更新</button>
+              <button id="btn-install-update" class="btn btn-sm btn-accent hidden">重啟並安裝</button>
+            </div>
+          </div>
+        </div>
 
-      <div class="settings-section settings-row">
-        <span class="settings-row-label">截圖後繼續播放</span>
-        <label class="toggle">
-          <input type="checkbox" id="resume-after-crop-input">
-          <span class="toggle-track"><span class="toggle-thumb"></span></span>
-        </label>
-      </div>
+      </div><!-- /settings-body -->
 
       <!-- Unsaved changes confirmation bar -->
       <div id="settings-confirm" class="hidden">
         <span>有未儲存的變更</span>
         <div class="settings-confirm-btns">
-          <button id="btn-confirm-discard" class="btn">放棄</button>
-          <button id="btn-confirm-save" class="btn btn-save">儲存</button>
+          <button id="btn-confirm-discard" class="btn btn-sm">放棄</button>
+          <button id="btn-confirm-save" class="btn btn-sm btn-save">儲存</button>
         </div>
       </div>
 
@@ -199,6 +239,7 @@
         <span id="settings-version"></span>
         <button id="btn-settings-save" class="btn btn-save">儲存</button>
       </div>
+
     </div>
   </div>
 
