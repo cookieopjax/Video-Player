@@ -23,6 +23,12 @@ const volFill        = document.getElementById('vol-fill')
 const volThumb       = document.getElementById('vol-thumb')
 const volLabel       = document.getElementById('vol-label')
 const volIcon        = document.getElementById('vol-icon')
+const volumeWrap     = document.getElementById('volume-wrap')
+const volPopup       = document.getElementById('vol-popup')
+const volPopupLabel  = document.getElementById('vol-popup-label')
+const volTrackVert   = document.getElementById('vol-track-vert')
+const volFillVert    = document.getElementById('vol-fill-vert')
+const volThumbVert   = document.getElementById('vol-thumb-vert')
 const cropCanvas     = document.getElementById('crop-canvas')
 const settingsOverlay = document.getElementById('settings-overlay')
 const speedChips     = document.getElementById('speed-chips')
@@ -36,6 +42,7 @@ const toastEl        = document.getElementById('toast')
 let config             = { speeds: [0.5, 1.0, 1.5, 2.0], jumpSeconds: 10, defaultVolume: 70 }
 let isDraggingProgress = false
 let isDraggingVolume   = false
+let isDraggingVolVert  = false
 let currentSpeed       = 1.0
 let currentFilePath    = ''
 let saveTimer          = null
@@ -154,7 +161,10 @@ function buildSpeedMenu() {
 }
 
 btnSpeed.addEventListener('click', (e) => { e.stopPropagation(); speedDropdown.classList.toggle('hidden') })
-document.addEventListener('click', () => speedDropdown.classList.add('hidden'))
+document.addEventListener('click', (e) => {
+  speedDropdown.classList.add('hidden')
+  if (!volumeWrap.contains(e.target)) volPopup.classList.add('hidden')
+})
 
 // ── Jump buttons + keyboard ────────────────────────────────────
 function updateJumpLabels() {
@@ -205,9 +215,13 @@ function setVolume(v) {
   const vol = clamp(v, 0, 1)
   video.volume = vol
   const pct = Math.round(vol * 100)
-  volFill.style.width  = pct + '%'
-  volThumb.style.left  = pct + '%'
-  volLabel.textContent = pct + '%'
+  volFill.style.width       = pct + '%'
+  volThumb.style.left       = pct + '%'
+  volLabel.textContent      = pct + '%'
+  // Vertical popup track
+  volFillVert.style.height  = pct + '%'
+  volThumbVert.style.bottom = `calc(${pct}% - 5.5px)`
+  volPopupLabel.textContent = pct + '%'
 }
 
 function volumeFromEvent(e) {
@@ -216,18 +230,42 @@ function volumeFromEvent(e) {
 }
 
 volTrack.addEventListener('mousedown', (e) => { isDraggingVolume = true; volumeFromEvent(e) })
-document.addEventListener('mousemove', (e) => { if (isDraggingVolume) volumeFromEvent(e) })
-document.addEventListener('mouseup',   ()  => { isDraggingVolume = false })
+document.addEventListener('mousemove', (e) => {
+  if (isDraggingVolume) volumeFromEvent(e)
+  if (isDraggingVolVert) volumeFromVertEvent(e)
+})
+document.addEventListener('mouseup', () => { isDraggingVolume = false; isDraggingVolVert = false })
 
-document.getElementById('volume-wrap').addEventListener('wheel', (e) => {
+// Vertical track (compact popup)
+function volumeFromVertEvent(e) {
+  const rect = volTrackVert.getBoundingClientRect()
+  setVolume(1 - clamp((e.clientY - rect.top) / rect.height, 0, 1))
+}
+volTrackVert.addEventListener('mousedown', (e) => { e.stopPropagation(); isDraggingVolVert = true; volumeFromVertEvent(e) })
+volPopup.addEventListener('click', (e) => e.stopPropagation())
+
+volumeWrap.addEventListener('wheel', (e) => {
   e.preventDefault()
   setVolume(video.volume + (e.deltaY < 0 ? 0.05 : -0.05))
 }, { passive: false })
 
-volIcon.addEventListener('click', () => {
-  video.muted = !video.muted
-  volIcon.textContent = video.muted ? '\uD83D\uDD07' : '\uD83D\uDD0A'
+volIcon.addEventListener('click', (e) => {
+  e.stopPropagation()
+  if (document.body.classList.contains('vol-compact')) {
+    volPopup.classList.toggle('hidden')
+  } else {
+    video.muted = !video.muted
+    volIcon.textContent = video.muted ? '\uD83D\uDD07' : '\uD83D\uDD0A'
+  }
 })
+
+// Compact mode detection
+function updateVolCompact() {
+  const compact = window.innerWidth < 750
+  document.body.classList.toggle('vol-compact', compact)
+  if (!compact) volPopup.classList.add('hidden')
+}
+window.addEventListener('resize', updateVolCompact)
 
 // ── Fullscreen ─────────────────────────────────────────────────
 function showControls() {
@@ -455,7 +493,22 @@ document.addEventListener('keydown', (e) => {
 document.getElementById('btn-screenshot').addEventListener('click', startCrop)
 
 // ── Settings panel ─────────────────────────────────────────────
-let editSpeeds = []
+let editSpeeds       = []
+let settingsOpenState = null   // JSON snapshot taken when settings opens
+
+function getSettingsFormState() {
+  return JSON.stringify({
+    speeds:          [...editSpeeds],
+    jumpSeconds:     parseInt(jumpInput.value) || 10,
+    defaultVolume:   parseInt(volDefaultInput.value),
+    autoPlay:        document.getElementById('autoplay-input').checked,
+    resumeAfterCrop: document.getElementById('resume-after-crop-input').checked,
+  })
+}
+
+function isSettingsDirty() {
+  return settingsOpenState !== null && getSettingsFormState() !== settingsOpenState
+}
 
 function buildSpeedChips() {
   speedChips.innerHTML = ''
@@ -479,11 +532,19 @@ function openSettings() {
   volDefaultLabel.textContent = config.defaultVolume + '%'
   document.getElementById('autoplay-input').checked = config.autoPlay !== false
   document.getElementById('resume-after-crop-input').checked = !!config.resumeAfterCrop
+  document.getElementById('settings-confirm').classList.add('hidden')
+  settingsOpenState = getSettingsFormState()
   settingsOverlay.classList.remove('hidden')
   requestAnimationFrame(() => settingsOverlay.classList.add('visible'))
 }
 
-function closeSettings() {
+function closeSettings(force = false) {
+  if (!force && isSettingsDirty()) {
+    document.getElementById('settings-confirm').classList.remove('hidden')
+    return
+  }
+  document.getElementById('settings-confirm').classList.add('hidden')
+  settingsOpenState = null
   settingsOverlay.classList.remove('visible')
   settingsOverlay.addEventListener('transitionend', () => settingsOverlay.classList.add('hidden'), { once: true })
 }
@@ -508,8 +569,8 @@ speedInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('btn-add-speed').click()
 })
 
-document.getElementById('btn-settings-save').addEventListener('click', async () => {
-  if (!editSpeeds.length) return
+async function doSaveSettings() {
+  if (!editSpeeds.length) return false
   const newConfig = {
     speeds:          editSpeeds,
     jumpSeconds:     parseInt(jumpInput.value) || 10,
@@ -523,13 +584,22 @@ document.getElementById('btn-settings-save').addEventListener('click', async () 
     config = newConfig
     buildSpeedMenu()
     updateJumpLabels()
-    closeSettings()
     showToast('設定已儲存')
+    return true
   } catch (err) {
     console.error('[saveConfig]', err)
     showToast('儲存失敗')
+    return false
   }
+}
+
+document.getElementById('btn-settings-save').addEventListener('click', async () => {
+  if (await doSaveSettings()) closeSettings(true)
 })
+document.getElementById('btn-confirm-save').addEventListener('click', async () => {
+  if (await doSaveSettings()) closeSettings(true)
+})
+document.getElementById('btn-confirm-discard').addEventListener('click', () => closeSettings(true))
 
 // ── Init ───────────────────────────────────────────────────────
 async function init() {
@@ -554,6 +624,7 @@ async function init() {
 
   video.playbackRate = currentSpeed
   btnSpeed.textContent = currentSpeed + 'x \u25BE'
+  updateVolCompact()
 }
 
 init()

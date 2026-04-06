@@ -12,8 +12,11 @@
   <div id="app-titlebar">
     <div id="app-titlebar-left">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-        <rect x="0.75" y="0.75" width="12.5" height="12.5" rx="3.5" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>
-        <polygon points="5,4 10.5,7 5,10" fill="rgba(255,255,255,0.65)"/>
+        <rect x="0.5" y="0.5" width="13" height="10.5" rx="2.5" fill="rgba(255,255,255,0.82)"/>
+        <polygon points="5.5,3.5 9.5,6.25 5.5,9" fill="rgba(0,0,0,0.65)"/>
+        <rect x="0.5" y="12" width="7" height="1.5" rx="0.75" fill="rgba(255,255,255,0.45)"/>
+        <circle cx="10" cy="12.75" r="0.75" fill="rgba(255,255,255,0.45)"/>
+        <circle cx="12.5" cy="12.75" r="0.75" fill="rgba(255,255,255,0.45)"/>
       </svg>
       <span>Video Player</span>
     </div>
@@ -112,6 +115,14 @@
             <div id="vol-thumb"></div>
           </div>
           <span id="vol-label">70%</span>
+          <!-- Compact volume popup (shown when window is narrow) -->
+          <div id="vol-popup" class="hidden">
+            <span id="vol-popup-label">70%</span>
+            <div id="vol-track-vert">
+              <div id="vol-fill-vert"></div>
+              <div id="vol-thumb-vert"></div>
+            </div>
+          </div>
         </div>
 
         <div id="speed-wrap">
@@ -173,6 +184,15 @@
           <input type="checkbox" id="resume-after-crop-input">
           <span class="toggle-track"><span class="toggle-thumb"></span></span>
         </label>
+      </div>
+
+      <!-- Unsaved changes confirmation bar -->
+      <div id="settings-confirm" class="hidden">
+        <span>有未儲存的變更</span>
+        <div class="settings-confirm-btns">
+          <button id="btn-confirm-discard" class="btn">放棄</button>
+          <button id="btn-confirm-save" class="btn btn-save">儲存</button>
+        </div>
       </div>
 
       <div id="settings-footer">
