@@ -210,9 +210,9 @@ body.fullscreen #controls.controls-visible {
   padding: 6px 14px 11px;
   display: flex; align-items: center;
 }
-#controls-left  { flex: 1; display: flex; align-items: center; gap: 6px; }
-#controls-center { display: flex; align-items: center; gap: 6px; }
-#controls-right { flex: 1; display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+#controls-left   { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; }
+#controls-center { flex-shrink: 0; display: flex; align-items: center; gap: 6px; }
+#controls-right  { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
 
 /* Base button */
 .btn {
@@ -266,11 +266,17 @@ body.fullscreen #controls.controls-visible {
   border-radius: 8px;
   background: var(--btn-bg);
   border: 1px solid var(--btn-border);
+  flex: 1;
+  min-width: 0;
+  max-width: 190px;
 }
 #vol-icon { font-size: 14px; cursor: pointer; user-select: none; opacity: 0.75; }
 #vol-icon:hover { opacity: 1; }
 #vol-track {
-  width: 130px; height: 20px;
+  flex: 1;
+  min-width: 40px;
+  max-width: 130px;
+  height: 20px;
   position: relative; cursor: pointer;
 }
 #vol-track::before {

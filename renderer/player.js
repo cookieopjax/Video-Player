@@ -130,6 +130,7 @@ function buildSpeedMenu() {
       currentSpeed = s
       video.playbackRate = s
       btnSpeed.textContent = s + 'x \u25BE'
+      localStorage.setItem('playbackSpeed', s)
       document.querySelectorAll('.speed-item').forEach((el) => el.classList.remove('active'))
       item.classList.add('active')
       speedDropdown.classList.add('hidden')
@@ -292,6 +293,7 @@ function loadFile(filePath) {
   addRecentFile(filePath)
   document.getElementById('recent-overlay').classList.add('hidden')
   video.src = 'file:///' + filePath.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/')
+  video.playbackRate = currentSpeed
   filenameEl.innerHTML = formatPath(filePath)
   video.play()
 }
@@ -486,10 +488,20 @@ document.getElementById('btn-settings-save').addEventListener('click', async () 
 // ── Init ───────────────────────────────────────────────────────
 async function init() {
   config = await window.electronAPI.getConfig()
+
+  // Restore saved speed (before buildSpeedMenu so active class is correct)
+  const savedSpeed = parseFloat(localStorage.getItem('playbackSpeed'))
+  if (savedSpeed > 0 && config.speeds.includes(savedSpeed)) {
+    currentSpeed = savedSpeed
+  }
+
   setVolume(config.defaultVolume / 100)
   buildSpeedMenu()
   updateJumpLabels()
   renderRecentFiles()
+
+  video.playbackRate = currentSpeed
+  btnSpeed.textContent = currentSpeed + 'x \u25BE'
 }
 
 init()
