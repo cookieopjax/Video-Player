@@ -29,13 +29,19 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: List build output
+        shell: bash
+        run: find dist -maxdepth 1 -name "*.exe" | sort
+
       - name: Create GitHub Release
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tag="${GITHUB_REF#refs/tags/}"
+          mapfile -t exes < <(find dist -maxdepth 1 -name "*.exe" | sort)
+          if [ ${#exes[@]} -eq 0 ]; then echo "No exe files found"; exit 1; fi
           gh release create "$tag" \
             --title "VideoPlayer $tag" \
             --generate-notes \
-            dist/*.exe
+            "${exes[@]}"

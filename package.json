@@ -6,7 +6,7 @@
   "scripts": {
     "start": "electron .",
     "test": "jest",
-    "build": "electron-builder"
+    "build": "electron-builder --publish never"
   },
   "devDependencies": {
     "electron": "^28.3.3",
@@ -23,13 +23,16 @@
       "target": [
         { "target": "nsis",     "arch": ["x64"] },
         { "target": "portable", "arch": ["x64"] }
-      ],
-      "artifactName": "${productName}-${version}-${arch}-${target}.${ext}"
+      ]
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "createDesktopShortcut": true,
+      "artifactName": "${productName}-${version}-Setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-Portable.${ext}"
     },
     "files": [
       "main.js",
