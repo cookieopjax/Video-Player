@@ -9,8 +9,16 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    runs-on: windows-latest
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+          - os: macos-latest
+            platform: mac
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
@@ -27,22 +35,46 @@ jobs:
         run: npm test
 
       - name: Build
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
         run: npm run build
 
-      - name: List build output
-        shell: bash
-        run: find dist -maxdepth 1 \( -name "*.exe" -o -name "*.yml" \) | sort
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.platform }}
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.yml
+            dist/*.blockmap
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-win
+          path: dist-win
+
+      - name: Download Mac artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-mac
+          path: dist-mac
 
       - name: Create GitHub Release
-        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tag="${GITHUB_REF#refs/tags/}"
-          mapfile -t exes < <(find dist -maxdepth 1 -name "*.exe" | sort)
-          mapfile -t ymls < <(find dist -maxdepth 1 -name "*.yml" | sort)
-          if [ ${#exes[@]} -eq 0 ]; then echo "No exe files found"; exit 1; fi
+          mapfile -t files < <(find dist-win dist-mac -type f | sort)
+          if [ ${#files[@]} -eq 0 ]; then echo "No files found"; exit 1; fi
           gh release create "$tag" \
             --title "VideoPlayer $tag" \
             --generate-notes \
-            "${exes[@]}" "${ymls[@]}"
+            --repo "$GITHUB_REPOSITORY" \
+            "${files[@]}"

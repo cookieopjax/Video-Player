@@ -623,8 +623,12 @@ document.getElementById('btn-confirm-save').addEventListener('click', async () =
 })
 document.getElementById('btn-confirm-discard').addEventListener('click', () => closeSettings(true))
 document.getElementById('btn-set-default').addEventListener('click', async () => {
-  await window.electronAPI.openDefaultAppsSettings()
-  showToast('請在 Windows 設定中找到 VideoPlayer 並完成設定')
+  const result = await window.electronAPI.openDefaultAppsSettings()
+  if (result && result.platform === 'mac') {
+    showToast('請在 Finder 中右鍵點擊影片檔案 → 打開方式 → 選擇 VideoPlayer → 全部更改')
+  } else {
+    showToast('請在 Windows 設定中找到 VideoPlayer 並完成設定')
+  }
 })
 
 // ── Auto-updater UI ────────────────────────────────────────────

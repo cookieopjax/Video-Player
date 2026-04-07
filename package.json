@@ -1,6 +1,6 @@
 {
   "name": "video-player",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "Personal video player",
   "main": "main.js",
   "scripts": {
@@ -51,6 +51,18 @@
     },
     "portable": {
       "artifactName": "${productName}-${version}-Portable.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["universal"]
+        }
+      ],
+      "category": "public.app-category.video"
+    },
+    "dmg": {
+      "artifactName": "${productName}-${version}-mac.${ext}"
     },
     "files": [
       "main.js",

@@ -157,13 +157,19 @@ ipcMain.handle('save-config', (event, newConfig) => {
 })
 
 ipcMain.handle('check-update', async () => {
-  if (!app.isPackaged) return { state: 'error', message: '開發模式無法檢查更新' }
-  try {
-    autoUpdater.checkForUpdates()
+  if (!app.isPackaged) {
+    sendUpdateStatus({ state: 'error', message: '開發模式無法檢查更新' })
     return { ok: true }
-  } catch (err) {
-    return { state: 'error', message: err.message }
   }
+  try {
+    const p = autoUpdater.checkForUpdates()
+    if (p && typeof p.catch === 'function') {
+      p.catch(err => sendUpdateStatus({ state: 'error', message: err.message }))
+    }
+  } catch (err) {
+    sendUpdateStatus({ state: 'error', message: err.message })
+  }
+  return { ok: true }
 })
 
 ipcMain.handle('download-update', () => {
@@ -175,5 +181,9 @@ ipcMain.handle('install-update', () => {
 })
 
 ipcMain.handle('open-default-apps-settings', async () => {
+  if (process.platform === 'darwin') {
+    return { platform: 'mac' }
+  }
   await shell.openExternal('ms-settings:defaultapps')
+  return { platform: 'win' }
 })
