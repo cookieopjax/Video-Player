@@ -314,7 +314,7 @@ body.fullscreen #controls.controls-visible {
   cursor: grab;
   pointer-events: none;
 }
-#vol-label { font-size: 11px; color: var(--text-muted); min-width: 30px; font-variant-numeric: tabular-nums; text-align: right; }
+#vol-label { font-size: 11px; color: var(--text); min-width: 30px; font-variant-numeric: tabular-nums; text-align: right; }
 
 /* ── Compact volume (narrow window) ───────────────────────── */
 body.vol-compact #vol-track,
