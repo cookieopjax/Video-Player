@@ -147,9 +147,12 @@
 
       <div id="settings-header">
         <span>設定</span>
-        <button id="btn-settings-close">
-          <svg width="12" height="12" viewBox="0 0 10 10"><line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        </button>
+        <div id="settings-header-right">
+          <span id="settings-version"></span>
+          <button id="btn-settings-close">
+            <svg width="12" height="12" viewBox="0 0 10 10"><line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+        </div>
       </div>
 
       <div id="settings-body">
@@ -237,20 +240,6 @@
         </div>
 
       </div><!-- /settings-body -->
-
-      <!-- Unsaved changes confirmation bar -->
-      <div id="settings-confirm" class="hidden">
-        <span>有未儲存的變更</span>
-        <div class="settings-confirm-btns">
-          <button id="btn-confirm-discard" class="btn btn-sm">放棄</button>
-          <button id="btn-confirm-save" class="btn btn-sm btn-save">儲存</button>
-        </div>
-      </div>
-
-      <div id="settings-footer">
-        <span id="settings-version"></span>
-        <button id="btn-settings-save" class="btn btn-save">儲存</button>
-      </div>
 
     </div>
   </div>

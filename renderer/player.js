@@ -269,8 +269,8 @@ volIcon.addEventListener('click', (e) => {
   }
 })
 
-// Compact mode — use ResizeObserver on controls-right with hysteresis to
-// avoid oscillation (compact ON < 260px, OFF only when > 310px).
+// Compact mode — ResizeObserver on controls-right with hysteresis.
+// compact ON < 320px, OFF only when > 390px (avoids oscillation).
 let volIsCompact = false
 const controlsRight = document.getElementById('controls-right')
 
@@ -282,8 +282,19 @@ function applyVolCompact(compact) {
 
 const volResizeObserver = new ResizeObserver(() => {
   const w = controlsRight.offsetWidth
-  if (!volIsCompact && w < 260) applyVolCompact(true)
-  else if (volIsCompact && w > 310) applyVolCompact(false)
+  if (!volIsCompact && w < 320) applyVolCompact(true)
+  else if (volIsCompact && w > 390) applyVolCompact(false)
+})
+
+// ctrl-compact — hide jump button labels when btn-row is tight.
+// compact ON < 520px, OFF > 570px.
+let ctrlIsCompact = false
+const btnRow = document.getElementById('btn-row')
+
+const ctrlResizeObserver = new ResizeObserver(() => {
+  const w = btnRow.offsetWidth
+  if (!ctrlIsCompact && w < 520) { ctrlIsCompact = true;  document.body.classList.add('ctrl-compact') }
+  else if (ctrlIsCompact && w > 570) { ctrlIsCompact = false; document.body.classList.remove('ctrl-compact') }
 })
 
 // ── Fullscreen ─────────────────────────────────────────────────
@@ -512,22 +523,43 @@ document.addEventListener('keydown', (e) => {
 document.getElementById('btn-screenshot').addEventListener('click', startCrop)
 
 // ── Settings panel ─────────────────────────────────────────────
-let editSpeeds       = []
-let settingsOpenState = null   // JSON snapshot taken when settings opens
+let editSpeeds    = []
+let autoSaveTimer = null
 
-function getSettingsFormState() {
-  return JSON.stringify({
-    speeds:           [...editSpeeds],
-    jumpSeconds:      parseInt(jumpInput.value) || 10,
-    defaultVolume:    parseInt(volDefaultInput.value),
-    autoPlay:         document.getElementById('autoplay-input').checked,
-    resumeAfterCrop:  document.getElementById('resume-after-crop-input').checked,
-    autoCheckUpdate:  document.getElementById('auto-check-update-input').checked,
-  })
+function collectConfig() {
+  return {
+    speeds:          [...editSpeeds],
+    jumpSeconds:     parseInt(jumpInput.value) || 10,
+    defaultVolume:   parseInt(volDefaultInput.value),
+    autoPlay:        document.getElementById('autoplay-input').checked,
+    resumeAfterCrop: document.getElementById('resume-after-crop-input').checked,
+    autoCheckUpdate: document.getElementById('auto-check-update-input').checked,
+  }
 }
 
-function isSettingsDirty() {
-  return settingsOpenState !== null && getSettingsFormState() !== settingsOpenState
+async function autoSave() {
+  if (!editSpeeds.length) return
+  const newConfig = collectConfig()
+  try {
+    const result = await window.electronAPI.saveConfig(newConfig)
+    if (result && result.ok === false) throw new Error(result.error)
+    config = newConfig
+    buildSpeedMenu()
+    updateJumpLabels()
+  } catch (err) {
+    console.error('[autoSave]', err)
+    showToast('儲存失敗')
+  }
+}
+
+function scheduleAutoSave() {
+  clearTimeout(autoSaveTimer)
+  autoSaveTimer = setTimeout(autoSave, 600)
+}
+
+function saveNow() {
+  clearTimeout(autoSaveTimer)
+  autoSave()
 }
 
 function buildSpeedChips() {
@@ -539,6 +571,7 @@ function buildSpeedChips() {
     chip.querySelector('.speed-chip-remove').addEventListener('click', () => {
       editSpeeds.splice(i, 1)
       buildSpeedChips()
+      saveNow()
     })
     speedChips.appendChild(chip)
   })
@@ -553,19 +586,13 @@ function openSettings() {
   document.getElementById('autoplay-input').checked = config.autoPlay !== false
   document.getElementById('resume-after-crop-input').checked = !!config.resumeAfterCrop
   document.getElementById('auto-check-update-input').checked = config.autoCheckUpdate !== false
-  document.getElementById('settings-confirm').classList.add('hidden')
-  settingsOpenState = getSettingsFormState()
   settingsOverlay.classList.remove('hidden')
   requestAnimationFrame(() => settingsOverlay.classList.add('visible'))
 }
 
-function closeSettings(force = false) {
-  if (!force && isSettingsDirty()) {
-    document.getElementById('settings-confirm').classList.remove('hidden')
-    return
-  }
-  document.getElementById('settings-confirm').classList.add('hidden')
-  settingsOpenState = null
+function closeSettings() {
+  clearTimeout(autoSaveTimer)
+  autoSave()  // flush any pending change
   settingsOverlay.classList.remove('visible')
   settingsOverlay.addEventListener('transitionend', () => settingsOverlay.classList.add('hidden'), { once: true })
 }
@@ -574,8 +601,14 @@ document.getElementById('btn-settings').addEventListener('click', openSettings)
 document.getElementById('btn-settings-close').addEventListener('click', closeSettings)
 settingsOverlay.addEventListener('click', (e) => { if (e.target === settingsOverlay) closeSettings() })
 
+// Auto-save wiring
+document.getElementById('autoplay-input').addEventListener('change', saveNow)
+document.getElementById('resume-after-crop-input').addEventListener('change', saveNow)
+document.getElementById('auto-check-update-input').addEventListener('change', saveNow)
+jumpInput.addEventListener('input', scheduleAutoSave)
 volDefaultInput.addEventListener('input', () => {
   volDefaultLabel.textContent = volDefaultInput.value + '%'
+  scheduleAutoSave()
 })
 
 document.getElementById('btn-add-speed').addEventListener('click', () => {
@@ -585,43 +618,12 @@ document.getElementById('btn-add-speed').addEventListener('click', () => {
   editSpeeds.sort((a, b) => a - b)
   buildSpeedChips()
   speedInput.value = ''
+  saveNow()
 })
 speedInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('btn-add-speed').click()
 })
 
-async function doSaveSettings() {
-  if (!editSpeeds.length) return false
-  const newConfig = {
-    speeds:           editSpeeds,
-    jumpSeconds:      parseInt(jumpInput.value) || 10,
-    defaultVolume:    parseInt(volDefaultInput.value),
-    autoPlay:         document.getElementById('autoplay-input').checked,
-    resumeAfterCrop:  document.getElementById('resume-after-crop-input').checked,
-    autoCheckUpdate:  document.getElementById('auto-check-update-input').checked,
-  }
-  try {
-    const result = await window.electronAPI.saveConfig(newConfig)
-    if (result && result.ok === false) throw new Error(result.error)
-    config = newConfig
-    buildSpeedMenu()
-    updateJumpLabels()
-    showToast('設定已儲存')
-    return true
-  } catch (err) {
-    console.error('[saveConfig]', err)
-    showToast('儲存失敗')
-    return false
-  }
-}
-
-document.getElementById('btn-settings-save').addEventListener('click', async () => {
-  if (await doSaveSettings()) closeSettings(true)
-})
-document.getElementById('btn-confirm-save').addEventListener('click', async () => {
-  if (await doSaveSettings()) closeSettings(true)
-})
-document.getElementById('btn-confirm-discard').addEventListener('click', () => closeSettings(true))
 document.getElementById('btn-set-default').addEventListener('click', async () => {
   const result = await window.electronAPI.openDefaultAppsSettings()
   if (result && result.platform === 'mac') {
@@ -723,8 +725,10 @@ async function init() {
   video.playbackRate = currentSpeed
   btnSpeed.textContent = currentSpeed + 'x \u25BE'
   volResizeObserver.observe(controlsRight)
-  // Trigger initial check
-  applyVolCompact(controlsRight.offsetWidth < 260)
+  ctrlResizeObserver.observe(btnRow)
+  // Trigger initial checks
+  applyVolCompact(controlsRight.offsetWidth < 320)
+  if (btnRow.offsetWidth < 520) { ctrlIsCompact = true; document.body.classList.add('ctrl-compact') }
 
   try {
     const ver = await window.electronAPI.getVersion()

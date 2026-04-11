@@ -428,35 +428,45 @@ body.vol-compact #vol-icon:hover { background: var(--btn-bg); }
   display: flex; align-items: center; justify-content: center;
   z-index: 5;
   background: #000;
+  padding: 16px;
 }
 #recent-overlay.hidden { display: none; }
 
 #recent-panel {
   text-align: center;
-  width: 100%; max-width: 420px;
-  padding: 0 24px;
+  width: 100%; max-width: 400px;
+  display: flex; flex-direction: column;
+  /* limit height so it doesn't overflow small windows */
+  max-height: calc(100% - 32px);
 }
 #recent-title {
   font-size: 11px; font-weight: 500; text-transform: uppercase;
-  letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 14px;
+  letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 10px;
+  flex-shrink: 0;
 }
 #recent-list {
-  list-style: none; display: flex; flex-direction: column; gap: 4px;
-  margin-bottom: 20px;
+  list-style: none; display: flex; flex-direction: column; gap: 3px;
+  margin-bottom: 12px;
+  overflow-y: auto; flex: 1; min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.1) transparent;
 }
+#recent-list::-webkit-scrollbar { width: 4px; }
+#recent-list::-webkit-scrollbar-track { background: transparent; }
+#recent-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
 #recent-list li {
-  padding: 9px 14px; border-radius: 8px;
+  padding: 8px 12px; border-radius: 8px;
   background: var(--btn-bg); border: 1px solid var(--btn-border);
   cursor: pointer; font-size: 13px; text-align: left;
   display: flex; align-items: center; gap: 4px;
   transition: background 0.12s;
-  overflow: hidden;
+  overflow: hidden; flex-shrink: 0;
 }
 #recent-list li:hover { background: var(--btn-hover); }
 .rf-folder { color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
 .rf-name   { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 #recent-hint {
-  font-size: 11px; color: var(--text-muted);
+  font-size: 11px; color: var(--text-muted); flex-shrink: 0;
 }
 #recent-hint kbd {
   display: inline-block; padding: 1px 5px; border-radius: 4px;
@@ -483,6 +493,7 @@ body.vol-compact #vol-icon:hover { background: var(--btn-bg); }
   border: 1px solid var(--glass-border);
   border-radius: 16px;
   width: 460px;
+  max-width: calc(100vw - 32px);
   max-height: 86vh;
   display: flex; flex-direction: column;
   box-shadow: 0 12px 48px rgba(0,0,0,0.6);
@@ -500,6 +511,10 @@ body.vol-compact #vol-icon:hover { background: var(--btn-bg); }
   border-bottom: 1px solid var(--glass-border);
   font-size: 15px; font-weight: 600; color: var(--text);
 }
+#settings-header-right {
+  display: flex; align-items: center; gap: 10px;
+}
+#settings-version { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; font-weight: 400; }
 #btn-settings-close {
   background: transparent; border: none; cursor: pointer;
   color: var(--text-muted); padding: 4px; border-radius: 50%;
@@ -624,32 +639,10 @@ body.vol-compact #vol-icon:hover { background: var(--btn-bg); }
 }
 .toggle input:checked + .toggle-track .toggle-thumb { transform: translateX(16px); background: #1c1c1e; }
 
-/* Settings confirm bar */
-#settings-confirm {
-  flex-shrink: 0;
-  padding: 11px 18px;
-  border-top: 1px solid var(--glass-border);
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  background: rgba(255, 214, 10, 0.05);
-  animation: confirm-slide 0.15s ease;
-}
-#settings-confirm.hidden { display: none; }
-@keyframes confirm-slide {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-#settings-confirm > span { font-size: 12px; color: var(--text-muted); }
-.settings-confirm-btns { display: flex; gap: 8px; flex-shrink: 0; }
-
-#settings-footer {
-  flex-shrink: 0;
-  padding: 13px 18px;
-  display: flex; align-items: center; justify-content: space-between;
-  border-top: 1px solid var(--glass-border);
-}
-#settings-version { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.btn-save { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.15); padding: 7px 20px; }
-.btn-save:hover { background: rgba(255,255,255,0.2); }
+/* ── Compact controls (narrow window) ─────────────────────────── */
+/* Hide jump-button text labels when controls are tight */
+body.ctrl-compact .btn-jump span { display: none; }
+body.ctrl-compact .btn-jump { padding: 6px 10px; }
 
 /* ── Toast ─────────────────────────────────────────────────── */
 #toast {
