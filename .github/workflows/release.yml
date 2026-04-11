@@ -46,7 +46,7 @@ jobs:
           path: |
             dist/*.exe
             dist/*.dmg
-            dist/*.yml
+            dist/latest*.yml
             dist/*.blockmap
 
   release:
@@ -73,6 +73,8 @@ jobs:
           tag="${GITHUB_REF#refs/tags/}"
           mapfile -t files < <(find dist-win dist-mac -type f | sort)
           if [ ${#files[@]} -eq 0 ]; then echo "No files found"; exit 1; fi
+          # Delete existing release if present (e.g. from a re-pushed tag)
+          gh release delete "$tag" --yes --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
           gh release create "$tag" \
             --title "VideoPlayer $tag" \
             --generate-notes \
