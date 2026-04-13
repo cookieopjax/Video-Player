@@ -27,6 +27,8 @@ function normalizeConfig(raw) {
     autoPlay:        raw?.autoPlay === true,
     resumeAfterCrop: raw?.resumeAfterCrop === true,
     autoCheckUpdate: raw?.autoCheckUpdate !== false,
+    hideDelay:       (typeof raw?.hideDelay === 'number' && raw.hideDelay >= 1 && isFinite(raw.hideDelay))
+                       ? Math.floor(raw.hideDelay) : 3,
   }
 }
 

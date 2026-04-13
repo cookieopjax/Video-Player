@@ -301,7 +301,7 @@ const ctrlResizeObserver = new ResizeObserver(() => {
 function showControls() {
   controls.classList.add('controls-visible')
   clearTimeout(fsHideTimer)
-  fsHideTimer = setTimeout(() => controls.classList.remove('controls-visible'), 3000)
+  fsHideTimer = setTimeout(() => controls.classList.remove('controls-visible'), (config.hideDelay || 3) * 1000)
 }
 
 function toggleFullscreen() {
@@ -445,6 +445,7 @@ function startCrop() {
   cropCanvas.height = container.clientHeight
   cropCtx = cropCanvas.getContext('2d')
   cropCanvas.classList.add('active')
+  document.body.classList.add('cropping')
   cropStart  = null
   isCropping = false
 }
@@ -463,6 +464,7 @@ function drawCropRect(x1, y1, x2, y2) {
 
 async function finalizeCrop(x1, y1, x2, y2) {
   cropCanvas.classList.remove('active')
+  document.body.classList.remove('cropping')
   isCropping = false
   cropStart  = null
   if (cropWasPlaying && config.resumeAfterCrop) video.play()
@@ -514,6 +516,7 @@ document.addEventListener('mouseup', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Escape' && cropCanvas.classList.contains('active')) {
     cropCanvas.classList.remove('active')
+    document.body.classList.remove('cropping')
     isCropping = false
     cropStart  = null
     if (cropWasPlaying) video.play()
@@ -534,6 +537,7 @@ function collectConfig() {
     autoPlay:        document.getElementById('autoplay-input').checked,
     resumeAfterCrop: document.getElementById('resume-after-crop-input').checked,
     autoCheckUpdate: document.getElementById('auto-check-update-input').checked,
+    hideDelay:       parseInt(document.getElementById('hide-delay-input').value) || 3,
   }
 }
 
@@ -586,6 +590,7 @@ function openSettings() {
   document.getElementById('autoplay-input').checked = config.autoPlay !== false
   document.getElementById('resume-after-crop-input').checked = !!config.resumeAfterCrop
   document.getElementById('auto-check-update-input').checked = config.autoCheckUpdate !== false
+  document.getElementById('hide-delay-input').value = config.hideDelay ?? 3
   settingsOverlay.classList.remove('hidden')
   requestAnimationFrame(() => settingsOverlay.classList.add('visible'))
 }
@@ -606,6 +611,7 @@ document.getElementById('autoplay-input').addEventListener('change', saveNow)
 document.getElementById('resume-after-crop-input').addEventListener('change', saveNow)
 document.getElementById('auto-check-update-input').addEventListener('change', saveNow)
 jumpInput.addEventListener('input', scheduleAutoSave)
+document.getElementById('hide-delay-input').addEventListener('input', scheduleAutoSave)
 volDefaultInput.addEventListener('input', () => {
   volDefaultLabel.textContent = volDefaultInput.value + '%'
   scheduleAutoSave()

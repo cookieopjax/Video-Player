@@ -4,5 +4,6 @@
   "defaultVolume": 70,
   "autoPlay": false,
   "resumeAfterCrop": false,
-  "autoCheckUpdate": true
+  "autoCheckUpdate": true,
+  "hideDelay": 3
 }

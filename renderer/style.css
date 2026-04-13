@@ -166,6 +166,10 @@ body.fullscreen #controls.controls-visible {
   opacity: 1; transform: translateY(0);
   pointer-events: auto;
 }
+body.cropping #controls {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
 
 /* ── Info bar ──────────────────────────────────────────────── */
 #title-bar {
@@ -282,7 +286,7 @@ body.fullscreen #controls.controls-visible {
   max-width: 190px;
   position: relative;
 }
-#vol-icon { font-size: 14px; cursor: pointer; user-select: none; opacity: 0.75; }
+#vol-icon { font-size: 14px; cursor: pointer; user-select: none; opacity: 0.75; line-height: 1; display: flex; align-items: center; }
 #vol-icon:hover { opacity: 1; }
 #vol-track {
   flex: 1;
@@ -314,7 +318,7 @@ body.fullscreen #controls.controls-visible {
   cursor: grab;
   pointer-events: none;
 }
-#vol-label { font-size: 11px; color: var(--text); min-width: 30px; font-variant-numeric: tabular-nums; text-align: right; }
+#vol-label { font-size: 11px; color: var(--text); min-width: 30px; font-variant-numeric: tabular-nums; text-align: right; line-height: 1; }
 
 /* ── Compact volume (narrow window) ───────────────────────── */
 body.vol-compact #vol-track,
