@@ -166,6 +166,9 @@ body.fullscreen #controls.controls-visible {
   opacity: 1; transform: translateY(0);
   pointer-events: auto;
 }
+/* Hide cursor in fullscreen; restore when controls are visible */
+body.fullscreen { cursor: none; }
+body.fullscreen.controls-visible { cursor: default; }
 body.cropping #controls {
   opacity: 0 !important;
   pointer-events: none !important;
@@ -244,6 +247,7 @@ body.cropping #controls {
   letter-spacing: 0.1px;
 }
 .btn:hover { background: var(--btn-hover); }
+.btn:disabled { opacity: 0.3; cursor: default; pointer-events: none; }
 
 /* Icon-only button (no border, lighter) */
 .btn-icon {
@@ -272,6 +276,7 @@ body.cropping #controls {
   color: var(--text);
   min-width: 52px;
   justify-content: center;
+  user-select: none;
 }
 
 /* ── Volume ────────────────────────────────────────────────── */
@@ -318,7 +323,7 @@ body.cropping #controls {
   cursor: grab;
   pointer-events: none;
 }
-#vol-label { font-size: 11px; color: var(--text); min-width: 30px; font-variant-numeric: tabular-nums; text-align: right; line-height: 1; }
+#vol-label { font-size: 11px; color: var(--text); min-width: 30px; font-variant-numeric: tabular-nums; text-align: right; line-height: 1; user-select: none; }
 
 /* ── Compact volume (narrow window) ───────────────────────── */
 body.vol-compact #vol-track,
@@ -356,7 +361,7 @@ body.vol-compact #vol-icon:hover { background: var(--btn-bg); }
   from { opacity: 0; transform: translateX(-50%) translateY(6px) scale(0.95); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
-#vol-popup-label { font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+#vol-popup-label { font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; user-select: none; }
 
 #vol-track-vert {
   width: 20px; height: 100px;
@@ -488,9 +493,6 @@ body.vol-compact #vol-icon:hover { background: var(--btn-bg); }
 .course-card-bottom {
   display: flex; align-items: center; gap: 10px;
 }
-.course-bar-time {
-  flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0;
-}
 .course-progress-bar {
   flex: 1; height: 3px; border-radius: 2px;
   background: var(--fill-track); overflow: hidden;
@@ -498,10 +500,6 @@ body.vol-compact #vol-icon:hover { background: var(--btn-bg); }
 .course-progress-fill {
   height: 100%; border-radius: 2px;
   background: var(--accent);
-}
-.course-time {
-  font-size: 11px; color: var(--text-muted);
-  font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0;
 }
 .course-continue-btn {
   font-size: 11px; padding: 4px 10px; border-radius: 6px;

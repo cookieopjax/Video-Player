@@ -47,6 +47,8 @@ let currentSpeed       = 1.0
 let currentFilePath    = ''
 let saveTimer          = null
 let fsHideTimer        = null
+let currentFolderFiles = []
+let currentFolderIndex = -1
 
 // ── Play/pause animation ───────────────────────────────────────
 const SVG_PLAY  = '<polygon points="5,3 19,12 5,21" fill="white"/>'
@@ -300,8 +302,12 @@ const ctrlResizeObserver = new ResizeObserver(() => {
 // ── Fullscreen ─────────────────────────────────────────────────
 function showControls() {
   controls.classList.add('controls-visible')
+  document.body.classList.add('controls-visible')
   clearTimeout(fsHideTimer)
-  fsHideTimer = setTimeout(() => controls.classList.remove('controls-visible'), (config.hideDelay || 3) * 1000)
+  fsHideTimer = setTimeout(() => {
+    controls.classList.remove('controls-visible')
+    document.body.classList.remove('controls-visible')
+  }, (config.hideDelay || 3) * 1000)
 }
 
 function toggleFullscreen() {
@@ -315,8 +321,13 @@ function toggleFullscreen() {
 document.addEventListener('fullscreenchange', () => {
   const isFs = !!document.fullscreenElement
   document.body.classList.toggle('fullscreen', isFs)
-  if (isFs) showControls()
-  else controls.classList.remove('controls-visible')
+  if (isFs) {
+    showControls()
+  } else {
+    clearTimeout(fsHideTimer)
+    controls.classList.remove('controls-visible')
+    document.body.classList.remove('controls-visible')
+  }
 })
 
 document.addEventListener('mousemove', () => {
@@ -326,6 +337,7 @@ document.addEventListener('mousemove', () => {
 document.getElementById('btn-fullscreen').addEventListener('click', toggleFullscreen)
 
 // ── Course / folder progress ───────────────────────────────────
+// (normalizePath, getFolderPath, getFolderName, escapeHtml, getAdjacentEpisode are in utils.js)
 const COURSE_KEY = 'courseData'
 
 function getCourseData() {
@@ -333,20 +345,6 @@ function getCourseData() {
 }
 function saveCourseData(data) {
   localStorage.setItem(COURSE_KEY, JSON.stringify(data))
-}
-function normalizePath(p) {
-  return (p || '').replace(/\\/g, '/')
-}
-function getFolderPath(filePath) {
-  const p = normalizePath(filePath)
-  const idx = p.lastIndexOf('/')
-  return idx > 0 ? p.slice(0, idx) : ''
-}
-function getFolderName(folderPath) {
-  return normalizePath(folderPath).split('/').filter(Boolean).pop() || folderPath
-}
-function escapeHtml(str) {
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
 async function updateCourseData(filePath) {
@@ -359,6 +357,11 @@ async function updateCourseData(filePath) {
   const normFile = normalizePath(filePath)
   const currentIndex = files.findIndex(f => normalizePath(f) === normFile)
   if (currentIndex < 0) return
+
+  // Update navigation state
+  currentFolderFiles = files
+  currentFolderIndex = currentIndex
+  updateNavButtons()
 
   const data = getCourseData()
   const key = folderPath
@@ -377,6 +380,12 @@ async function updateCourseData(filePath) {
   saveCourseData(data)
 }
 
+function updateNavButtons() {
+  document.getElementById('btn-prev').disabled = currentFolderIndex <= 0
+  document.getElementById('btn-next').disabled =
+    currentFolderIndex < 0 || currentFolderIndex >= currentFolderFiles.length - 1
+}
+
 function renderCoursePanel() {
   const overlay = document.getElementById('recent-overlay')
   const listEl  = document.getElementById('course-list')
@@ -393,11 +402,9 @@ function renderCoursePanel() {
   }
   emptyEl.classList.add('hidden')
 
-  // Sort by playCount desc, then lastAccessed desc
   courses.sort((a, b) => (b.playCount - a.playCount) || (b.lastAccessed - a.lastAccessed))
 
   courses.slice(0, 6).forEach(course => {
-    const pos         = parseFloat(localStorage.getItem('pos:' + course.maxEpisodeFile)) || 0
     const episodeNum  = (course.maxEpisodeIndex ?? 0) + 1
     const totalFiles  = course.totalFiles || 1
     const progressPct = Math.min(100, (course.maxEpisodeIndex / totalFiles) * 100)
@@ -410,11 +417,8 @@ function renderCoursePanel() {
         <div class="course-meta">${episodeNum}&thinsp;/&thinsp;${totalFiles}</div>
       </div>
       <div class="course-card-bottom">
-        <div class="course-bar-time">
-          <div class="course-progress-bar">
-            <div class="course-progress-fill" style="width:${progressPct.toFixed(1)}%"></div>
-          </div>
-          <span class="course-time">${formatTime(pos)}</span>
+        <div class="course-progress-bar">
+          <div class="course-progress-fill" style="width:${progressPct.toFixed(1)}%"></div>
         </div>
         <button class="btn course-continue-btn">&#9654; 繼續</button>
       </div>
@@ -461,6 +465,15 @@ function loadFile(filePath, forcePlay = false) {
 document.getElementById('btn-open').addEventListener('click', async () => {
   const filePath = await window.electronAPI.openFile()
   if (filePath) loadFile(filePath)
+})
+
+document.getElementById('btn-prev').addEventListener('click', () => {
+  const prev = getAdjacentEpisode(currentFolderFiles, currentFilePath, -1)
+  if (prev) loadFile(prev)
+})
+document.getElementById('btn-next').addEventListener('click', () => {
+  const next = getAdjacentEpisode(currentFolderFiles, currentFilePath, 1)
+  if (next) loadFile(next)
 })
 
 document.addEventListener('dragover', (e) => { e.preventDefault(); dropOverlay.classList.add('active') })

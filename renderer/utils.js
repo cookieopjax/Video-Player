@@ -32,5 +32,43 @@ function normalizeConfig(raw) {
   }
 }
 
+// ── Path helpers ──────────────────────────────────────────────
+function normalizePath(p) {
+  return (p || '').replace(/\\/g, '/')
+}
+
+function getFolderPath(filePath) {
+  const p = normalizePath(filePath)
+  const idx = p.lastIndexOf('/')
+  return idx > 0 ? p.slice(0, idx) : ''
+}
+
+function getFolderName(folderPath) {
+  return normalizePath(folderPath).split('/').filter(Boolean).pop() || folderPath
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+// Returns the adjacent file in a sorted list, or null if out of bounds.
+// delta: -1 for previous, +1 for next.
+function getAdjacentEpisode(files, currentFilePath, delta) {
+  if (!Array.isArray(files) || !files.length) return null
+  const normCurrent = normalizePath(currentFilePath)
+  const idx = files.findIndex(f => normalizePath(f) === normCurrent)
+  if (idx < 0) return null
+  const newIdx = idx + delta
+  if (newIdx < 0 || newIdx >= files.length) return null
+  return files[newIdx]
+}
+
 // Browser: globals. Node (Jest): module.exports
-if (typeof module !== 'undefined') module.exports = { formatTime, clamp, normalizeConfig }
+if (typeof module !== 'undefined') module.exports = {
+  formatTime, clamp, normalizeConfig,
+  normalizePath, getFolderPath, getFolderName, escapeHtml, getAdjacentEpisode,
+}

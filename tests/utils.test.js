@@ -1,4 +1,7 @@
-const { formatTime, clamp, normalizeConfig } = require('../renderer/utils')
+const {
+  formatTime, clamp, normalizeConfig,
+  normalizePath, getFolderPath, getFolderName, escapeHtml, getAdjacentEpisode,
+} = require('../renderer/utils')
 
 // ── formatTime ─────────────────────────────────────────────────
 describe('formatTime', () => {
@@ -123,5 +126,114 @@ describe('normalizeConfig', () => {
     expect(normalizeConfig({ autoCheckUpdate: false }).autoCheckUpdate).toBe(false)
     expect(normalizeConfig({ autoCheckUpdate: true }).autoCheckUpdate).toBe(true)
     expect(normalizeConfig({ autoCheckUpdate: 0 }).autoCheckUpdate).toBe(true)
+  })
+})
+
+// ── normalizePath ──────────────────────────────────────────────
+describe('normalizePath', () => {
+  test('converts backslashes to forward slashes', () => {
+    expect(normalizePath('C:\\Users\\foo\\bar.mp4')).toBe('C:/Users/foo/bar.mp4')
+  })
+  test('leaves forward slashes unchanged', () => {
+    expect(normalizePath('/Users/foo/bar.mp4')).toBe('/Users/foo/bar.mp4')
+  })
+  test('returns empty string for null', () => {
+    expect(normalizePath(null)).toBe('')
+  })
+  test('returns empty string for undefined', () => {
+    expect(normalizePath(undefined)).toBe('')
+  })
+  test('handles mixed slashes', () => {
+    expect(normalizePath('C:/Users\\foo/bar')).toBe('C:/Users/foo/bar')
+  })
+})
+
+// ── getFolderPath ──────────────────────────────────────────────
+describe('getFolderPath', () => {
+  test('returns folder from Windows backslash path', () => {
+    expect(getFolderPath('C:\\Videos\\Course\\ep01.mp4')).toBe('C:/Videos/Course')
+  })
+  test('returns folder from Unix path', () => {
+    expect(getFolderPath('/home/user/videos/ep01.mp4')).toBe('/home/user/videos')
+  })
+  test('returns empty string when no directory separator', () => {
+    expect(getFolderPath('file.mp4')).toBe('')
+  })
+  test('handles path with only one level', () => {
+    expect(getFolderPath('/file.mp4')).toBe('')
+  })
+})
+
+// ── getFolderName ──────────────────────────────────────────────
+describe('getFolderName', () => {
+  test('returns last path segment', () => {
+    expect(getFolderName('C:/Videos/A科目')).toBe('A科目')
+  })
+  test('handles Windows backslash path', () => {
+    expect(getFolderName('C:\\Videos\\Course')).toBe('Course')
+  })
+  test('ignores trailing slash', () => {
+    expect(getFolderName('/Videos/Course/')).toBe('Course')
+  })
+  test('returns full path as fallback for root path', () => {
+    expect(getFolderName('CourseName')).toBe('CourseName')
+  })
+})
+
+// ── escapeHtml ─────────────────────────────────────────────────
+describe('escapeHtml', () => {
+  test('escapes angle brackets', () => {
+    expect(escapeHtml('<script>')).toBe('&lt;script&gt;')
+  })
+  test('escapes ampersand', () => {
+    expect(escapeHtml('a & b')).toBe('a &amp; b')
+  })
+  test('escapes double quotes', () => {
+    expect(escapeHtml('"hello"')).toBe('&quot;hello&quot;')
+  })
+  test('leaves safe text unchanged', () => {
+    expect(escapeHtml('Hello World')).toBe('Hello World')
+  })
+  test('converts non-string values to string', () => {
+    expect(escapeHtml(123)).toBe('123')
+  })
+  test('handles all special chars together', () => {
+    expect(escapeHtml('<a href="x&y">')).toBe('&lt;a href=&quot;x&amp;y&quot;&gt;')
+  })
+})
+
+// ── getAdjacentEpisode ─────────────────────────────────────────
+describe('getAdjacentEpisode', () => {
+  const files = ['/videos/ep1.mp4', '/videos/ep2.mp4', '/videos/ep3.mp4']
+
+  test('returns next episode', () => {
+    expect(getAdjacentEpisode(files, '/videos/ep1.mp4', 1)).toBe('/videos/ep2.mp4')
+  })
+  test('returns previous episode', () => {
+    expect(getAdjacentEpisode(files, '/videos/ep2.mp4', -1)).toBe('/videos/ep1.mp4')
+  })
+  test('returns null when already at first and going backward', () => {
+    expect(getAdjacentEpisode(files, '/videos/ep1.mp4', -1)).toBeNull()
+  })
+  test('returns null when already at last and going forward', () => {
+    expect(getAdjacentEpisode(files, '/videos/ep3.mp4', 1)).toBeNull()
+  })
+  test('returns null when file not found in list', () => {
+    expect(getAdjacentEpisode(files, '/videos/unknown.mp4', 1)).toBeNull()
+  })
+  test('returns null for empty list', () => {
+    expect(getAdjacentEpisode([], '/videos/ep1.mp4', 1)).toBeNull()
+  })
+  test('handles Windows backslash paths', () => {
+    const winFiles = ['C:\\videos\\ep1.mp4', 'C:\\videos\\ep2.mp4', 'C:\\videos\\ep3.mp4']
+    expect(getAdjacentEpisode(winFiles, 'C:\\videos\\ep2.mp4', 1)).toBe('C:\\videos\\ep3.mp4')
+    expect(getAdjacentEpisode(winFiles, 'C:\\videos\\ep2.mp4', -1)).toBe('C:\\videos\\ep1.mp4')
+  })
+  test('matches cross-slash: backslash in list, forward slash in current', () => {
+    const winFiles = ['C:\\videos\\ep1.mp4', 'C:\\videos\\ep2.mp4']
+    expect(getAdjacentEpisode(winFiles, 'C:/videos/ep1.mp4', 1)).toBe('C:\\videos\\ep2.mp4')
+  })
+  test('skips by delta=2 when within bounds', () => {
+    expect(getAdjacentEpisode(files, '/videos/ep1.mp4', 2)).toBe('/videos/ep3.mp4')
   })
 })
