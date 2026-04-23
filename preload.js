@@ -19,4 +19,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('open-file-arg', (_, filePath) => cb(filePath))
   },
   openDefaultAppsSettings: () => ipcRenderer.invoke('open-default-apps-settings'),
+  listFolderVideos: (folderPath) => ipcRenderer.invoke('list-folder-videos', folderPath),
 })

@@ -325,39 +325,107 @@ document.addEventListener('mousemove', () => {
 
 document.getElementById('btn-fullscreen').addEventListener('click', toggleFullscreen)
 
-// ── Recent files ───────────────────────────────────────────────
-const RECENT_KEY = 'recentFiles'
-const RECENT_MAX = 8
+// ── Course / folder progress ───────────────────────────────────
+const COURSE_KEY = 'courseData'
 
-function getRecentFiles() {
-  try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || [] } catch { return [] }
+function getCourseData() {
+  try { return JSON.parse(localStorage.getItem(COURSE_KEY)) || {} } catch { return {} }
+}
+function saveCourseData(data) {
+  localStorage.setItem(COURSE_KEY, JSON.stringify(data))
+}
+function normalizePath(p) {
+  return (p || '').replace(/\\/g, '/')
+}
+function getFolderPath(filePath) {
+  const p = normalizePath(filePath)
+  const idx = p.lastIndexOf('/')
+  return idx > 0 ? p.slice(0, idx) : ''
+}
+function getFolderName(folderPath) {
+  return normalizePath(folderPath).split('/').filter(Boolean).pop() || folderPath
+}
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-function addRecentFile(filePath) {
-  let list = getRecentFiles().filter(p => p !== filePath)
-  list.unshift(filePath)
-  localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_MAX)))
+async function updateCourseData(filePath) {
+  const folderPath = getFolderPath(filePath)
+  if (!folderPath) return
+  let files = []
+  try { files = await window.electronAPI.listFolderVideos(folderPath) } catch { return }
+  if (!files.length) return
+
+  const normFile = normalizePath(filePath)
+  const currentIndex = files.findIndex(f => normalizePath(f) === normFile)
+  if (currentIndex < 0) return
+
+  const data = getCourseData()
+  const key = folderPath
+  const existing = data[key] || {}
+  const prevMaxIndex = existing.maxEpisodeIndex ?? -1
+  const newMaxIndex = Math.max(prevMaxIndex, currentIndex)
+
+  data[key] = {
+    folderName:      getFolderName(folderPath),
+    maxEpisodeIndex: newMaxIndex,
+    maxEpisodeFile:  currentIndex >= prevMaxIndex ? filePath : (existing.maxEpisodeFile || filePath),
+    totalFiles:      files.length,
+    playCount:       (existing.playCount || 0) + 1,
+    lastAccessed:    Date.now(),
+  }
+  saveCourseData(data)
+  renderCoursePanel()
 }
 
-function fileLabel(filePath) {
-  const parts = filePath.replace(/\\/g, '/').split('/')
-  return parts.length >= 2
-    ? `<span class="rf-folder">${parts[parts.length - 2]}/</span><span class="rf-name">${parts[parts.length - 1]}</span>`
-    : `<span class="rf-name">${parts[parts.length - 1]}</span>`
-}
-
-function renderRecentFiles() {
+function renderCoursePanel() {
   const overlay = document.getElementById('recent-overlay')
-  const list    = getRecentFiles()
-  if (list.length === 0) { overlay.classList.add('hidden'); return }
+  const listEl  = document.getElementById('course-list')
+  const emptyEl = document.getElementById('course-empty-msg')
+  const data    = getCourseData()
+  const courses = Object.values(data)
+
   overlay.classList.remove('hidden')
-  const ul = overlay.querySelector('#recent-list')
-  ul.innerHTML = ''
-  list.forEach(fp => {
-    const li = document.createElement('li')
-    li.innerHTML = fileLabel(fp)
-    li.addEventListener('click', () => loadFile(fp))
-    ul.appendChild(li)
+  listEl.innerHTML = ''
+
+  if (courses.length === 0) {
+    emptyEl.classList.remove('hidden')
+    return
+  }
+  emptyEl.classList.add('hidden')
+
+  // Sort by playCount desc, then lastAccessed desc
+  courses.sort((a, b) => (b.playCount - a.playCount) || (b.lastAccessed - a.lastAccessed))
+
+  courses.slice(0, 6).forEach(course => {
+    const pos         = parseFloat(localStorage.getItem('pos:' + course.maxEpisodeFile)) || 0
+    const episodeNum  = (course.maxEpisodeIndex ?? 0) + 1
+    const totalFiles  = course.totalFiles || 1
+    const progressPct = Math.min(100, (course.maxEpisodeIndex / totalFiles) * 100)
+
+    const card = document.createElement('div')
+    card.className = 'course-card'
+    card.innerHTML = `
+      <div class="course-card-top">
+        <div class="course-name">${escapeHtml(course.folderName)}</div>
+        <div class="course-meta">ep.${episodeNum}&thinsp;/&thinsp;${totalFiles}</div>
+      </div>
+      <div class="course-card-bottom">
+        <div class="course-bar-time">
+          <div class="course-progress-bar">
+            <div class="course-progress-fill" style="width:${progressPct.toFixed(1)}%"></div>
+          </div>
+          <span class="course-time">${formatTime(pos)}</span>
+        </div>
+        <button class="btn course-continue-btn">&#9654; 繼續</button>
+      </div>
+    `
+    card.querySelector('.course-continue-btn').addEventListener('click', (e) => {
+      e.stopPropagation()
+      loadFile(course.maxEpisodeFile)
+    })
+    card.addEventListener('click', () => loadFile(course.maxEpisodeFile))
+    listEl.appendChild(card)
   })
 }
 
@@ -383,8 +451,8 @@ function loadFile(filePath, forcePlay = false) {
     return
   }
   currentFilePath = filePath
-  addRecentFile(filePath)
   document.getElementById('recent-overlay').classList.add('hidden')
+  updateCourseData(filePath)  // fire-and-forget
   video.src = 'file:///' + filePath.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/')
   video.playbackRate = currentSpeed
   filenameEl.innerHTML = formatPath(filePath)
@@ -726,7 +794,7 @@ async function init() {
   setVolume(config.defaultVolume / 100)
   buildSpeedMenu()
   updateJumpLabels()
-  renderRecentFiles()
+  renderCoursePanel()
 
   video.playbackRate = currentSpeed
   btnSpeed.textContent = currentSpeed + 'x \u25BE'

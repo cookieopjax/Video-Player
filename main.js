@@ -187,3 +187,16 @@ ipcMain.handle('open-default-apps-settings', async () => {
   await shell.openExternal('ms-settings:defaultapps')
   return { platform: 'win' }
 })
+
+ipcMain.handle('list-folder-videos', (event, folderPath) => {
+  try {
+    const exts = new Set(['mp4', 'webm', 'mov', 'avi', 'mkv', 'm4v', 'flv', 'wmv'])
+    return fs.readdirSync(folderPath, { withFileTypes: true })
+      .filter(e => e.isFile() && exts.has(path.extname(e.name).slice(1).toLowerCase()))
+      .map(e => e.name)
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+      .map(name => path.join(folderPath, name))
+  } catch {
+    return []
+  }
+})
