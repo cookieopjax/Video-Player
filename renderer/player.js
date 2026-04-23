@@ -375,7 +375,6 @@ async function updateCourseData(filePath) {
     lastAccessed:    Date.now(),
   }
   saveCourseData(data)
-  renderCoursePanel()
 }
 
 function renderCoursePanel() {
@@ -408,7 +407,7 @@ function renderCoursePanel() {
     card.innerHTML = `
       <div class="course-card-top">
         <div class="course-name">${escapeHtml(course.folderName)}</div>
-        <div class="course-meta">ep.${episodeNum}&thinsp;/&thinsp;${totalFiles}</div>
+        <div class="course-meta">${episodeNum}&thinsp;/&thinsp;${totalFiles}</div>
       </div>
       <div class="course-card-bottom">
         <div class="course-bar-time">
