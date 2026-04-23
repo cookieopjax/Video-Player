@@ -166,9 +166,12 @@ body.fullscreen #controls.controls-visible {
   opacity: 1; transform: translateY(0);
   pointer-events: auto;
 }
-/* Hide cursor in fullscreen; restore when controls are visible */
-body.fullscreen { cursor: none; }
-body.fullscreen.controls-visible { cursor: default; }
+/* Hide cursor in fullscreen — must use * to override cursor:pointer on buttons/tracks */
+body.fullscreen,
+body.fullscreen * { cursor: none !important; }
+/* Restore cursor only over the controls bar when it's visible */
+body.fullscreen.controls-visible #controls,
+body.fullscreen.controls-visible #controls * { cursor: default !important; }
 body.cropping #controls {
   opacity: 0 !important;
   pointer-events: none !important;
@@ -470,36 +473,36 @@ body.vol-compact #vol-icon:hover { background: var(--btn-bg); }
   background: var(--btn-bg);
   border: 1px solid var(--btn-border);
   border-radius: 10px;
-  padding: 11px 14px 10px;
+  padding: 9px 12px;
   cursor: pointer; text-align: left;
   transition: background 0.12s;
   flex-shrink: 0;
-  display: flex; flex-direction: column; gap: 8px;
+  display: flex; flex-direction: row; align-items: center; gap: 8px;
 }
 .course-card:hover { background: var(--btn-hover); }
 
-.course-card-top {
-  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
-}
 .course-name {
+  flex: 1; min-width: 0;
   font-size: 13px; font-weight: 500; color: var(--text);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
-}
-.course-meta {
-  font-size: 11px; color: var(--text-muted);
-  font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0;
-}
-
-.course-card-bottom {
-  display: flex; align-items: center; gap: 10px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .course-progress-bar {
-  flex: 1; height: 3px; border-radius: 2px;
+  flex: 0 0 72px; height: 3px; border-radius: 2px;
   background: var(--fill-track); overflow: hidden;
 }
 .course-progress-fill {
   height: 100%; border-radius: 2px;
   background: var(--accent);
+}
+.course-ep {
+  flex-shrink: 0;
+  font-size: 11px; color: var(--text); font-weight: 500;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.course-time {
+  flex-shrink: 0;
+  font-size: 10px; color: var(--text-muted);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .course-continue-btn {
   font-size: 11px; padding: 4px 10px; border-radius: 6px;

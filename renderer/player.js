@@ -247,7 +247,12 @@ document.addEventListener('mousemove', (e) => {
   if (isDraggingVolume) volumeFromEvent(e)
   if (isDraggingVolVert) volumeFromVertEvent(e)
 })
-document.addEventListener('mouseup', () => { isDraggingVolume = false; isDraggingVolVert = false })
+document.addEventListener('mouseup', () => {
+  const wasDragging = isDraggingVolume || isDraggingVolVert
+  isDraggingVolume = false
+  isDraggingVolVert = false
+  if (wasDragging) saveFolderVolume()
+})
 
 // Vertical track (compact popup)
 function volumeFromVertEvent(e) {
@@ -260,6 +265,7 @@ volPopup.addEventListener('click', (e) => e.stopPropagation())
 volumeWrap.addEventListener('wheel', (e) => {
   e.preventDefault()
   setVolume(video.volume + (e.deltaY < 0 ? 0.05 : -0.05))
+  saveFolderVolume()
 }, { passive: false })
 
 volIcon.addEventListener('click', (e) => {
@@ -438,6 +444,7 @@ function renderCoursePanel() {
   courses.sort((a, b) => (b.playCount - a.playCount) || (b.lastAccessed - a.lastAccessed))
 
   courses.slice(0, 6).forEach(course => {
+    const pos         = parseFloat(localStorage.getItem('pos:' + course.maxEpisodeFile)) || 0
     const episodeNum  = (course.maxEpisodeIndex ?? 0) + 1
     const totalFiles  = course.totalFiles || 1
     const progressPct = Math.min(100, (course.maxEpisodeIndex / totalFiles) * 100)
@@ -445,16 +452,13 @@ function renderCoursePanel() {
     const card = document.createElement('div')
     card.className = 'course-card'
     card.innerHTML = `
-      <div class="course-card-top">
-        <div class="course-name">${escapeHtml(course.folderName)}</div>
-        <div class="course-meta">${episodeNum}&thinsp;/&thinsp;${totalFiles}</div>
+      <div class="course-name">${escapeHtml(course.folderName)}</div>
+      <div class="course-progress-bar">
+        <div class="course-progress-fill" style="width:${progressPct.toFixed(1)}%"></div>
       </div>
-      <div class="course-card-bottom">
-        <div class="course-progress-bar">
-          <div class="course-progress-fill" style="width:${progressPct.toFixed(1)}%"></div>
-        </div>
-        <button class="btn course-continue-btn">&#9654; 繼續</button>
-      </div>
+      <span class="course-ep">${episodeNum}&thinsp;/&thinsp;${totalFiles}</span>
+      <span class="course-time">${formatTime(pos)}</span>
+      <button class="btn course-continue-btn">&#9654; 繼續</button>
     `
     card.querySelector('.course-continue-btn').addEventListener('click', (e) => {
       e.stopPropagation()
@@ -481,6 +485,20 @@ function isSupportedVideo(filePath) {
   return SUPPORTED_EXTS.has(ext)
 }
 
+// ── Per-folder volume ──────────────────────────────────────────
+function saveFolderVolume() {
+  const folderPath = getFolderPath(currentFilePath)
+  if (!folderPath) return
+  localStorage.setItem('vol:' + folderPath, Math.round(video.volume * 100))
+}
+
+function applyFolderVolume(filePath) {
+  const folderPath = getFolderPath(filePath)
+  if (!folderPath) return
+  const saved = parseFloat(localStorage.getItem('vol:' + folderPath))
+  if (!isNaN(saved)) setVolume(saved / 100)
+}
+
 function loadFile(filePath, forcePlay = false) {
   if (!isSupportedVideo(filePath)) {
     showToast('不支援的格式')
@@ -488,6 +506,7 @@ function loadFile(filePath, forcePlay = false) {
   }
   currentFilePath = filePath
   watchReset()
+  applyFolderVolume(filePath)
   document.getElementById('recent-overlay').classList.add('hidden')
   loadFolderContext(filePath)  // fire-and-forget, updates nav buttons
   video.src = 'file:///' + filePath.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/')
