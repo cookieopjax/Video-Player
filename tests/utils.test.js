@@ -1,6 +1,7 @@
 const {
   formatTime, clamp, normalizeConfig,
   normalizePath, getFolderPath, getFolderName, escapeHtml, getAdjacentEpisode,
+  buildCourseEntry,
 } = require('../renderer/utils')
 
 // ── formatTime ─────────────────────────────────────────────────
@@ -235,5 +236,59 @@ describe('getAdjacentEpisode', () => {
   })
   test('skips by delta=2 when within bounds', () => {
     expect(getAdjacentEpisode(files, '/videos/ep1.mp4', 2)).toBe('/videos/ep3.mp4')
+  })
+})
+
+// ── buildCourseEntry ───────────────────────────────────────────
+describe('buildCourseEntry', () => {
+  const files    = ['/v/ep1.mp4', '/v/ep2.mp4', '/v/ep3.mp4', '/v/ep4.mp4']
+  const folder   = '/v'
+
+  test('creates a new entry from scratch', () => {
+    const entry = buildCourseEntry({}, files, 0, '/v/ep1.mp4', folder)
+    expect(entry.maxEpisodeIndex).toBe(0)
+    expect(entry.maxEpisodeFile).toBe('/v/ep1.mp4')
+    expect(entry.totalFiles).toBe(4)
+    expect(entry.playCount).toBe(1)
+    expect(entry.folderName).toBe('v')
+  })
+
+  test('advances maxEpisodeIndex when watching further episode', () => {
+    const prev  = buildCourseEntry({}, files, 1, '/v/ep2.mp4', folder)
+    const entry = buildCourseEntry(prev, files, 2, '/v/ep3.mp4', folder)
+    expect(entry.maxEpisodeIndex).toBe(2)
+    expect(entry.maxEpisodeFile).toBe('/v/ep3.mp4')
+    expect(entry.playCount).toBe(2)
+  })
+
+  test('does NOT retreat maxEpisodeIndex when going back to earlier episode', () => {
+    const prev  = buildCourseEntry({}, files, 2, '/v/ep3.mp4', folder)
+    const entry = buildCourseEntry(prev, files, 0, '/v/ep1.mp4', folder)
+    expect(entry.maxEpisodeIndex).toBe(2)
+    expect(entry.maxEpisodeFile).toBe('/v/ep3.mp4')
+  })
+
+  test('keeps maxEpisodeFile when re-watching the same max episode', () => {
+    const prev  = buildCourseEntry({}, files, 2, '/v/ep3.mp4', folder)
+    const entry = buildCourseEntry(prev, files, 2, '/v/ep3.mp4', folder)
+    expect(entry.maxEpisodeIndex).toBe(2)
+    expect(entry.maxEpisodeFile).toBe('/v/ep3.mp4')
+  })
+
+  test('increments playCount on each call', () => {
+    let entry = buildCourseEntry({}, files, 0, '/v/ep1.mp4', folder)
+    entry = buildCourseEntry(entry, files, 0, '/v/ep1.mp4', folder)
+    entry = buildCourseEntry(entry, files, 0, '/v/ep1.mp4', folder)
+    expect(entry.playCount).toBe(3)
+  })
+
+  test('totalFiles reflects current files list length', () => {
+    const entry = buildCourseEntry({}, files, 0, '/v/ep1.mp4', folder)
+    expect(entry.totalFiles).toBe(files.length)
+  })
+
+  test('folderName derived from folderPath', () => {
+    const entry = buildCourseEntry({}, files, 0, '/v/ep1.mp4', '/Videos/A科目')
+    expect(entry.folderName).toBe('A科目')
   })
 })

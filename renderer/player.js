@@ -130,6 +130,7 @@ video.addEventListener('timeupdate', () => {
   saveTimer = setTimeout(() => {
     localStorage.setItem('pos:' + currentFilePath, video.currentTime)
   }, 4000)
+  watchTick()
 })
 
 video.addEventListener('loadedmetadata', () => {
@@ -338,7 +339,8 @@ document.getElementById('btn-fullscreen').addEventListener('click', toggleFullsc
 
 // ── Course / folder progress ───────────────────────────────────
 // (normalizePath, getFolderPath, getFolderName, escapeHtml, getAdjacentEpisode are in utils.js)
-const COURSE_KEY = 'courseData'
+const COURSE_KEY        = 'courseData'
+const PROGRESS_MIN_SECS = 300   // must watch 5 minutes before committing progress
 
 function getCourseData() {
   try { return JSON.parse(localStorage.getItem(COURSE_KEY)) || {} } catch { return {} }
@@ -347,38 +349,69 @@ function saveCourseData(data) {
   localStorage.setItem(COURSE_KEY, JSON.stringify(data))
 }
 
-async function updateCourseData(filePath) {
+// Called immediately on file load — scans folder for nav buttons only.
+async function loadFolderContext(filePath) {
   const folderPath = getFolderPath(filePath)
   if (!folderPath) return
   let files = []
   try { files = await window.electronAPI.listFolderVideos(folderPath) } catch { return }
   if (!files.length) return
-
   const normFile = normalizePath(filePath)
-  const currentIndex = files.findIndex(f => normalizePath(f) === normFile)
-  if (currentIndex < 0) return
-
-  // Update navigation state
+  const idx = files.findIndex(f => normalizePath(f) === normFile)
   currentFolderFiles = files
-  currentFolderIndex = currentIndex
+  currentFolderIndex = idx
   updateNavButtons()
+}
+
+// Called after PROGRESS_MIN_SECS of actual playback — commits max-episode progress.
+function commitCourseProgress(filePath) {
+  if (!currentFolderFiles.length) return
+  const normFile = normalizePath(filePath)
+  const currentIndex = currentFolderFiles.findIndex(f => normalizePath(f) === normFile)
+  if (currentIndex < 0) return
+  const folderPath = getFolderPath(filePath)
+  if (!folderPath) return
 
   const data = getCourseData()
-  const key = folderPath
-  const existing = data[key] || {}
-  const prevMaxIndex = existing.maxEpisodeIndex ?? -1
-  const newMaxIndex = Math.max(prevMaxIndex, currentIndex)
-
-  data[key] = {
-    folderName:      getFolderName(folderPath),
-    maxEpisodeIndex: newMaxIndex,
-    maxEpisodeFile:  currentIndex >= prevMaxIndex ? filePath : (existing.maxEpisodeFile || filePath),
-    totalFiles:      files.length,
-    playCount:       (existing.playCount || 0) + 1,
-    lastAccessed:    Date.now(),
-  }
+  const key  = folderPath
+  data[key]  = buildCourseEntry(data[key] || {}, currentFolderFiles, currentIndex, filePath, folderPath)
   saveCourseData(data)
 }
+
+// ── Watch-time guard ───────────────────────────────────────────
+let watchAccum        = 0      // accumulated play seconds for current file
+let watchPlayStart    = null   // wall-clock ms when last play started (null if paused)
+let progressCommitted = false  // true once commitCourseProgress fired for this file
+
+function watchPlay() {
+  if (watchPlayStart === null) watchPlayStart = Date.now()
+}
+function watchPause() {
+  if (watchPlayStart !== null) {
+    watchAccum += (Date.now() - watchPlayStart) / 1000
+    watchPlayStart = null
+  }
+  if (!progressCommitted && watchAccum >= PROGRESS_MIN_SECS) {
+    progressCommitted = true
+    commitCourseProgress(currentFilePath)
+  }
+}
+// Called on timeupdate to catch continuous playback without pause
+function watchTick() {
+  if (progressCommitted || watchPlayStart === null) return
+  if (watchAccum + (Date.now() - watchPlayStart) / 1000 >= PROGRESS_MIN_SECS) {
+    watchPause()
+  }
+}
+function watchReset() {
+  watchAccum = 0
+  watchPlayStart = null
+  progressCommitted = false
+}
+
+video.addEventListener('play',  watchPlay)
+video.addEventListener('pause', watchPause)
+video.addEventListener('ended', watchPause)
 
 function updateNavButtons() {
   document.getElementById('btn-prev').disabled = currentFolderIndex <= 0
@@ -454,8 +487,9 @@ function loadFile(filePath, forcePlay = false) {
     return
   }
   currentFilePath = filePath
+  watchReset()
   document.getElementById('recent-overlay').classList.add('hidden')
-  updateCourseData(filePath)  // fire-and-forget
+  loadFolderContext(filePath)  // fire-and-forget, updates nav buttons
   video.src = 'file:///' + filePath.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/')
   video.playbackRate = currentSpeed
   filenameEl.innerHTML = formatPath(filePath)
@@ -740,7 +774,9 @@ function setUpdateUI(state, data = {}) {
       btnCheckUpdate.disabled = true
       break
     case 'up-to-date':
-      updateStatusText.textContent = '已是最新版本 ✓'
+      updateStatusText.textContent = data.latestVersion
+        ? `已是最新版本 v${data.latestVersion} ✓`
+        : '已是最新版本 ✓'
       break
     case 'available':
       updateStatusText.textContent = `發現新版本 v${data.version}`

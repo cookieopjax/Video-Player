@@ -34,9 +34,11 @@ function readConfig() {
 }
 
 // ── Auto-updater ───────────────────────────────────────────────
-autoUpdater.autoDownload    = false
+autoUpdater.autoDownload         = false
 autoUpdater.autoInstallOnAppQuit = false
-autoUpdater.logger          = null   // silence built-in logger
+autoUpdater.logger               = null
+// Prevent CDN from returning a cached latest.yml that lags behind the real release
+autoUpdater.requestHeaders       = { 'Cache-Control': 'no-cache' }
 
 function sendUpdateStatus(status) {
   mainWin?.webContents.send('update-status', status)
@@ -44,7 +46,7 @@ function sendUpdateStatus(status) {
 
 autoUpdater.on('checking-for-update',  ()     => sendUpdateStatus({ state: 'checking' }))
 autoUpdater.on('update-available',     (info) => sendUpdateStatus({ state: 'available', version: info.version }))
-autoUpdater.on('update-not-available', ()     => sendUpdateStatus({ state: 'up-to-date' }))
+autoUpdater.on('update-not-available', (info) => sendUpdateStatus({ state: 'up-to-date', latestVersion: info?.version }))
 autoUpdater.on('download-progress',    (p)    => sendUpdateStatus({ state: 'downloading', percent: Math.round(p.percent) }))
 autoUpdater.on('update-downloaded',    ()     => sendUpdateStatus({ state: 'downloaded' }))
 autoUpdater.on('error',                (err)  => sendUpdateStatus({ state: 'error', message: err.message }))
