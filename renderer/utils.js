@@ -1,5 +1,5 @@
 function formatTime(seconds) {
-  if (isNaN(seconds) || seconds < 0) return '00:00'
+  if (isNaN(seconds) || !isFinite(seconds) || seconds < 0) return '00:00'
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
   const s = Math.floor(seconds % 60)

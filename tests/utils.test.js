@@ -30,6 +30,9 @@ describe('formatTime', () => {
   test('truncates fractional seconds', () => {
     expect(formatTime(61.9)).toBe('01:01')
   })
+  test('returns 00:00 for Infinity', () => {
+    expect(formatTime(Infinity)).toBe('00:00')
+  })
 })
 
 // ── clamp ──────────────────────────────────────────────────────
@@ -128,6 +131,29 @@ describe('normalizeConfig', () => {
     expect(normalizeConfig({ autoCheckUpdate: true }).autoCheckUpdate).toBe(true)
     expect(normalizeConfig({ autoCheckUpdate: 0 }).autoCheckUpdate).toBe(true)
   })
+
+  // ── hideDelay ──
+  test('hideDelay defaults to 3 when not provided', () => {
+    expect(normalizeConfig({}).hideDelay).toBe(3)
+    expect(normalizeConfig(null).hideDelay).toBe(3)
+  })
+
+  test('hideDelay accepts valid integer', () => {
+    expect(normalizeConfig({ hideDelay: 5 }).hideDelay).toBe(5)
+  })
+
+  test('hideDelay truncates fractional value', () => {
+    expect(normalizeConfig({ hideDelay: 4.9 }).hideDelay).toBe(4)
+  })
+
+  test('hideDelay ignores values below 1', () => {
+    expect(normalizeConfig({ hideDelay: 0 }).hideDelay).toBe(3)
+    expect(normalizeConfig({ hideDelay: -2 }).hideDelay).toBe(3)
+  })
+
+  test('hideDelay ignores non-numeric value', () => {
+    expect(normalizeConfig({ hideDelay: 'fast' }).hideDelay).toBe(3)
+  })
 })
 
 // ── normalizePath ──────────────────────────────────────────────
@@ -143,6 +169,9 @@ describe('normalizePath', () => {
   })
   test('returns empty string for undefined', () => {
     expect(normalizePath(undefined)).toBe('')
+  })
+  test('returns empty string for empty string', () => {
+    expect(normalizePath('')).toBe('')
   })
   test('handles mixed slashes', () => {
     expect(normalizePath('C:/Users\\foo/bar')).toBe('C:/Users/foo/bar')
@@ -162,6 +191,12 @@ describe('getFolderPath', () => {
   })
   test('handles path with only one level', () => {
     expect(getFolderPath('/file.mp4')).toBe('')
+  })
+  test('returns empty string for null', () => {
+    expect(getFolderPath(null)).toBe('')
+  })
+  test('returns empty string for empty string', () => {
+    expect(getFolderPath('')).toBe('')
   })
 })
 
@@ -225,6 +260,9 @@ describe('getAdjacentEpisode', () => {
   test('returns null for empty list', () => {
     expect(getAdjacentEpisode([], '/videos/ep1.mp4', 1)).toBeNull()
   })
+  test('returns null for null list', () => {
+    expect(getAdjacentEpisode(null, '/videos/ep1.mp4', 1)).toBeNull()
+  })
   test('handles Windows backslash paths', () => {
     const winFiles = ['C:\\videos\\ep1.mp4', 'C:\\videos\\ep2.mp4', 'C:\\videos\\ep3.mp4']
     expect(getAdjacentEpisode(winFiles, 'C:\\videos\\ep2.mp4', 1)).toBe('C:\\videos\\ep3.mp4')
@@ -236,6 +274,12 @@ describe('getAdjacentEpisode', () => {
   })
   test('skips by delta=2 when within bounds', () => {
     expect(getAdjacentEpisode(files, '/videos/ep1.mp4', 2)).toBe('/videos/ep3.mp4')
+  })
+  test('returns null for single-item list going forward', () => {
+    expect(getAdjacentEpisode(['/videos/ep1.mp4'], '/videos/ep1.mp4', 1)).toBeNull()
+  })
+  test('returns null for single-item list going backward', () => {
+    expect(getAdjacentEpisode(['/videos/ep1.mp4'], '/videos/ep1.mp4', -1)).toBeNull()
   })
 })
 
@@ -290,5 +334,20 @@ describe('buildCourseEntry', () => {
   test('folderName derived from folderPath', () => {
     const entry = buildCourseEntry({}, files, 0, '/v/ep1.mp4', '/Videos/A科目')
     expect(entry.folderName).toBe('A科目')
+  })
+
+  test('maxEpisodeIndex of 0 is not treated as unset when revisiting ep1', () => {
+    const base  = buildCourseEntry({}, files, 0, '/v/ep1.mp4', folder)
+    const entry = buildCourseEntry(base, files, 0, '/v/ep1.mp4', folder)
+    expect(entry.maxEpisodeIndex).toBe(0)
+    expect(entry.maxEpisodeFile).toBe('/v/ep1.mp4')
+  })
+
+  test('lastAccessed is a current timestamp', () => {
+    const before = Date.now()
+    const entry  = buildCourseEntry({}, files, 0, '/v/ep1.mp4', folder)
+    const after  = Date.now()
+    expect(entry.lastAccessed).toBeGreaterThanOrEqual(before)
+    expect(entry.lastAccessed).toBeLessThanOrEqual(after)
   })
 })

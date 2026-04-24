@@ -485,11 +485,11 @@ body.vol-compact #vol-icon:hover { background: var(--btn-bg); }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .course-progress-bar {
-  flex: 0 0 200px; height: 15px; border-radius: 6px;
+  flex: 0 0 300px; height: 10px; border-radius: 5px;
   background: var(--fill-track); overflow: hidden;
 }
 .course-progress-fill {
-  height: 100%; border-radius: 6px;
+  height: 100%; border-radius: 5px;
   background: var(--accent);
 }
 .course-ep {
