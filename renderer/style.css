@@ -166,12 +166,9 @@ body.fullscreen #controls.controls-visible {
   opacity: 1; transform: translateY(0);
   pointer-events: auto;
 }
-/* Hide cursor in fullscreen — must use * to override cursor:pointer on buttons/tracks */
-body.fullscreen,
-body.fullscreen * { cursor: none !important; }
-/* Restore cursor only over the controls bar when it's visible */
-body.fullscreen.controls-visible #controls,
-body.fullscreen.controls-visible #controls * { cursor: default !important; }
+/* Hide cursor in fullscreen when controls bar is hidden */
+body.fullscreen:not(.controls-visible),
+body.fullscreen:not(.controls-visible) * { cursor: none !important; }
 body.cropping #controls {
   opacity: 0 !important;
   pointer-events: none !important;
@@ -248,6 +245,7 @@ body.cropping #controls {
   transition: background 0.12s;
   font-family: inherit;
   letter-spacing: 0.1px;
+  user-select: none;
 }
 .btn:hover { background: var(--btn-hover); }
 .btn:disabled { opacity: 0.3; cursor: default; pointer-events: none; }
@@ -487,7 +485,7 @@ body.vol-compact #vol-icon:hover { background: var(--btn-bg); }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .course-progress-bar {
-  flex: 0 0 72px; height: 3px; border-radius: 2px;
+  flex: 0 0 100px; height: 5px; border-radius: 3px;
   background: var(--fill-track); overflow: hidden;
 }
 .course-progress-fill {
