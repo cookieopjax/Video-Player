@@ -485,11 +485,11 @@ body.vol-compact #vol-icon:hover { background: var(--btn-bg); }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .course-progress-bar {
-  flex: 0 0 100px; height: 5px; border-radius: 3px;
+  flex: 0 0 200px; height: 15px; border-radius: 6px;
   background: var(--fill-track); overflow: hidden;
 }
 .course-progress-fill {
-  height: 100%; border-radius: 2px;
+  height: 100%; border-radius: 6px;
   background: var(--accent);
 }
 .course-ep {
@@ -502,12 +502,6 @@ body.vol-compact #vol-icon:hover { background: var(--btn-bg); }
   font-size: 10px; color: var(--text-muted);
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.course-continue-btn {
-  font-size: 11px; padding: 4px 10px; border-radius: 6px;
-  background: var(--accent); border-color: var(--accent-border);
-  flex-shrink: 0;
-}
-.course-continue-btn:hover { background: var(--accent-hover); }
 
 #course-empty-msg {
   font-size: 13px; color: var(--text-muted);

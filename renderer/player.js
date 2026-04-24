@@ -458,12 +458,7 @@ function renderCoursePanel() {
       </div>
       <span class="course-ep">${episodeNum}&thinsp;/&thinsp;${totalFiles}</span>
       <span class="course-time">${formatTime(pos)}</span>
-      <button class="btn course-continue-btn">&#9654; 繼續</button>
     `
-    card.querySelector('.course-continue-btn').addEventListener('click', (e) => {
-      e.stopPropagation()
-      loadFile(course.maxEpisodeFile)
-    })
     card.addEventListener('click', () => loadFile(course.maxEpisodeFile))
     listEl.appendChild(card)
   })
@@ -514,6 +509,8 @@ function loadFile(filePath, forcePlay = false) {
   filenameEl.innerHTML = formatPath(filePath)
   if (forcePlay || config.autoPlay !== false) video.play().catch(() => { /* autoplay blocked — ignored */ })
 }
+
+document.getElementById('btn-home').addEventListener('click', () => renderCoursePanel())
 
 document.getElementById('btn-open').addEventListener('click', async () => {
   const filePath = await window.electronAPI.openFile()
