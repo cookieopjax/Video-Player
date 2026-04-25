@@ -154,6 +154,30 @@ describe('normalizeConfig', () => {
   test('hideDelay ignores non-numeric value', () => {
     expect(normalizeConfig({ hideDelay: 'fast' }).hideDelay).toBe(3)
   })
+
+  // ── glassOpacity ──
+  test('glassOpacity defaults to 42 when not provided', () => {
+    expect(normalizeConfig({}).glassOpacity).toBe(42)
+    expect(normalizeConfig(null).glassOpacity).toBe(42)
+  })
+
+  test('glassOpacity passes through valid value', () => {
+    expect(normalizeConfig({ glassOpacity: 80 }).glassOpacity).toBe(80)
+    expect(normalizeConfig({ glassOpacity: 0 }).glassOpacity).toBe(0)
+  })
+
+  test('glassOpacity clamps to 0-100', () => {
+    expect(normalizeConfig({ glassOpacity: 150 }).glassOpacity).toBe(100)
+    expect(normalizeConfig({ glassOpacity: -10 }).glassOpacity).toBe(0)
+  })
+
+  test('glassOpacity rounds fractional value', () => {
+    expect(normalizeConfig({ glassOpacity: 63.7 }).glassOpacity).toBe(64)
+  })
+
+  test('glassOpacity ignores non-numeric value', () => {
+    expect(normalizeConfig({ glassOpacity: 'dark' }).glassOpacity).toBe(42)
+  })
 })
 
 // ── normalizePath ──────────────────────────────────────────────

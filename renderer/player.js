@@ -34,8 +34,10 @@ const settingsOverlay = document.getElementById('settings-overlay')
 const speedChips     = document.getElementById('speed-chips')
 const speedInput     = document.getElementById('speed-input')
 const jumpInput      = document.getElementById('jump-input')
-const volDefaultInput = document.getElementById('vol-default-input')
-const volDefaultLabel = document.getElementById('vol-default-label')
+const volDefaultInput    = document.getElementById('vol-default-input')
+const volDefaultLabel    = document.getElementById('vol-default-label')
+const glassOpacityInput  = document.getElementById('glass-opacity-input')
+const glassOpacityLabel  = document.getElementById('glass-opacity-label')
 const toastEl        = document.getElementById('toast')
 
 // ── State ──────────────────────────────────────────────────────
@@ -668,7 +670,12 @@ function collectConfig() {
     resumeAfterCrop: document.getElementById('resume-after-crop-input').checked,
     autoCheckUpdate: document.getElementById('auto-check-update-input').checked,
     hideDelay:       parseInt(document.getElementById('hide-delay-input').value) || 3,
+    glassOpacity:    parseInt(glassOpacityInput.value),
   }
+}
+
+function applyGlassOpacity(pct) {
+  document.documentElement.style.setProperty('--glass-alpha', (pct / 100).toFixed(2))
 }
 
 async function autoSave() {
@@ -721,6 +728,8 @@ function openSettings() {
   document.getElementById('resume-after-crop-input').checked = !!config.resumeAfterCrop
   document.getElementById('auto-check-update-input').checked = config.autoCheckUpdate !== false
   document.getElementById('hide-delay-input').value = config.hideDelay ?? 3
+  glassOpacityInput.value = config.glassOpacity
+  glassOpacityLabel.textContent = config.glassOpacity + '%'
   settingsOverlay.classList.remove('hidden')
   requestAnimationFrame(() => settingsOverlay.classList.add('visible'))
 }
@@ -744,6 +753,11 @@ jumpInput.addEventListener('input', scheduleAutoSave)
 document.getElementById('hide-delay-input').addEventListener('input', scheduleAutoSave)
 volDefaultInput.addEventListener('input', () => {
   volDefaultLabel.textContent = volDefaultInput.value + '%'
+  scheduleAutoSave()
+})
+glassOpacityInput.addEventListener('input', () => {
+  glassOpacityLabel.textContent = glassOpacityInput.value + '%'
+  applyGlassOpacity(parseInt(glassOpacityInput.value))
   scheduleAutoSave()
 })
 
@@ -856,6 +870,7 @@ async function init() {
   }
 
   setVolume(config.defaultVolume / 100)
+  applyGlassOpacity(config.glassOpacity)
   buildSpeedMenu()
   updateJumpLabels()
   renderCoursePanel()

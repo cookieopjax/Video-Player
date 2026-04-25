@@ -29,6 +29,8 @@ function normalizeConfig(raw) {
     autoCheckUpdate: raw?.autoCheckUpdate !== false,
     hideDelay:       (typeof raw?.hideDelay === 'number' && raw.hideDelay >= 1 && isFinite(raw.hideDelay))
                        ? Math.floor(raw.hideDelay) : 3,
+    glassOpacity:    (typeof raw?.glassOpacity === 'number' && isFinite(raw.glassOpacity))
+                       ? clamp(Math.round(raw.glassOpacity), 0, 100) : 42,
   }
 }
 
