@@ -21,6 +21,7 @@ button:focus-visible  { outline: none; animation: focus-ring-fade 3s ease forwar
   --fill:         rgba(255, 255, 255, 0.88);
   --fill-track:   rgba(255, 255, 255, 0.14);
   --titlebar-h:   34px;
+  --controls-h:   104px;
   --accent:       rgba(66, 148, 255, 0.82);
   --accent-hover: rgba(66, 148, 255, 1);
   --accent-border:rgba(66, 148, 255, 0.5);
@@ -439,19 +440,20 @@ body.vol-compact #vol-icon:hover { background: var(--btn-bg); }
   display: flex; align-items: center; justify-content: center;
   z-index: 5;
   background: #000;
-  padding: 16px;
+  /* pad away the titlebar above and controls bar below so content centres in the visible area */
+  padding: calc(var(--titlebar-h) + 20px) 28px calc(var(--controls-h) + 20px);
 }
 #recent-overlay.hidden { display: none; }
 
 #recent-panel {
-  text-align: center;
-  width: 100%; max-width: 520px;
+  width: 100%; max-width: 580px;
+  max-height: 100%;
   display: flex; flex-direction: column;
-  max-height: calc(100% - 32px);
+  text-align: center;
 }
 #recent-title {
   font-size: 11px; font-weight: 500; text-transform: uppercase;
-  letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 10px;
+  letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 12px;
   flex-shrink: 0;
 }
 
@@ -486,7 +488,8 @@ body.vol-compact #vol-icon:hover { background: var(--btn-bg); }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .course-progress-bar {
-  flex: 0 0 300px; height: 10px; border-radius: 5px;
+  flex: 0 1 200px; min-width: 80px;
+  height: 10px; border-radius: 5px;
   background: var(--fill-track); overflow: hidden;
 }
 .course-progress-fill {
