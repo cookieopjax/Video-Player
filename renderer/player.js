@@ -434,8 +434,19 @@ function renderCoursePanel() {
   const data    = getCourseData()
   const courses = Object.values(data)
 
+  video.pause()
+  video.removeAttribute('src')
+  video.load()
+  currentFilePath    = ''
+  currentFolderFiles = []
+  currentFolderIndex = -1
+  watchReset()
+  clearTimeout(saveTimer)
+  filenameEl.textContent = '尚未開啟影片'
+  setProgress(0)
+  timeDisplay.textContent = '00:00 / 00:00'
+  updateNavButtons()
   overlay.classList.remove('hidden')
-  document.body.classList.add('at-home')
   listEl.innerHTML = ''
 
   if (courses.length === 0) {
@@ -506,7 +517,6 @@ function loadFile(filePath, forcePlay = false) {
   watchReset()
   applyFolderVolume(filePath)
   document.getElementById('recent-overlay').classList.add('hidden')
-  document.body.classList.remove('at-home')
   loadFolderContext(filePath)  // fire-and-forget, updates nav buttons
   video.src = 'file:///' + filePath.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/')
   video.playbackRate = currentSpeed
