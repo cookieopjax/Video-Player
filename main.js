@@ -64,12 +64,6 @@ function findFileArg(argv) {
   return null
 }
 
-// ── Single-instance lock ───────────────────────────────────────
-const gotSingleLock = app.requestSingleInstanceLock()
-if (!gotSingleLock) {
-  app.quit()
-}
-
 // ── Window ─────────────────────────────────────────────────────
 let mainWin = null
 let pendingFileArg = null
@@ -93,16 +87,6 @@ function createWindow() {
     }
   })
 }
-
-app.on('second-instance', (event, argv) => {
-  // Another instance was launched — bring this window to front and open the file
-  const filePath = findFileArg(argv)
-  if (mainWin) {
-    if (mainWin.isMinimized()) mainWin.restore()
-    mainWin.focus()
-    if (filePath) mainWin.webContents.send('open-file-arg', filePath)
-  }
-})
 
 app.whenReady().then(() => {
   pendingFileArg = findFileArg(process.argv)
