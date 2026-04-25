@@ -435,6 +435,7 @@ function renderCoursePanel() {
   const courses = Object.values(data)
 
   overlay.classList.remove('hidden')
+  document.body.classList.add('at-home')
   listEl.innerHTML = ''
 
   if (courses.length === 0) {
@@ -505,6 +506,7 @@ function loadFile(filePath, forcePlay = false) {
   watchReset()
   applyFolderVolume(filePath)
   document.getElementById('recent-overlay').classList.add('hidden')
+  document.body.classList.remove('at-home')
   loadFolderContext(filePath)  // fire-and-forget, updates nav buttons
   video.src = 'file:///' + filePath.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/')
   video.playbackRate = currentSpeed
