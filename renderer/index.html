@@ -167,111 +167,113 @@
         </div>
       </div>
 
+      <!-- Tab nav -->
+      <div id="settings-tabs">
+        <button class="sg-tab active" data-tab="playback">播放</button>
+        <button class="sg-tab" data-tab="speed">速度</button>
+        <button class="sg-tab" data-tab="appearance">外觀</button>
+        <button class="sg-tab" data-tab="system">系統</button>
+      </div>
+
       <div id="settings-body">
 
-        <!-- 播放 -->
-        <div class="sg">
-          <div class="sg-title">播放</div>
-          <div class="sg-row">
-            <span class="sg-label">開啟後自動播放</span>
-            <label class="toggle">
-              <input type="checkbox" id="autoplay-input">
-              <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            </label>
-          </div>
-          <div class="sg-row">
-            <span class="sg-label">跳躍秒數</span>
-            <input id="jump-input" type="number" min="1" max="300" step="1" class="sg-num-input">
-          </div>
-          <div class="sg-row">
-            <span class="sg-label">工具欄自動隱藏秒數</span>
-            <input id="hide-delay-input" type="number" min="1" max="30" step="1" class="sg-num-input">
-          </div>
-          <div class="sg-row sg-row-col">
-            <div class="sg-row-top">
-              <span class="sg-label">預設音量</span>
-              <span id="vol-default-label" class="sg-label-val">70%</span>
+        <!-- Tab: 播放 -->
+        <div class="sg-tab-pane active" data-pane="playback">
+          <div class="sg">
+            <div class="sg-row">
+              <span class="sg-label">開啟後自動播放</span>
+              <label class="toggle">
+                <input type="checkbox" id="autoplay-input">
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              </label>
             </div>
-            <input id="vol-default-input" type="range" min="0" max="100" step="1" class="sg-range">
-          </div>
-        </div>
-
-        <!-- 外觀 -->
-        <div class="sg">
-          <div class="sg-title">外觀</div>
-          <div class="sg-row sg-row-col">
-            <div class="sg-row-top">
-              <span class="sg-label">介面透明度</span>
-              <span id="glass-opacity-label" class="sg-label-val">42%</span>
+            <div class="sg-row">
+              <span class="sg-label">跳躍秒數</span>
+              <input id="jump-input" type="number" min="1" max="300" step="1" class="sg-num-input">
             </div>
-            <input id="glass-opacity-input" type="range" min="0" max="100" step="1" class="sg-range">
-          </div>
-        </div>
-
-        <!-- 播放速度 -->
-        <div class="sg">
-          <div class="sg-title">播放速度</div>
-          <div class="sg-pad">
-            <div id="speed-chips"></div>
-            <div class="sg-add-row">
-              <input id="speed-input" type="number" min="0.1" max="10" step="0.25" placeholder="新增…">
-              <button id="btn-add-speed" class="btn">＋ 新增</button>
+            <div class="sg-row">
+              <span class="sg-label">工具欄自動隱藏秒數</span>
+              <input id="hide-delay-input" type="number" min="1" max="30" step="1" class="sg-num-input">
             </div>
-          </div>
-        </div>
-
-        <!-- 截圖 -->
-        <div class="sg">
-          <div class="sg-title">截圖</div>
-          <div class="sg-row">
-            <span class="sg-label">截圖後繼續播放</span>
-            <label class="toggle">
-              <input type="checkbox" id="resume-after-crop-input">
-              <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            </label>
-          </div>
-        </div>
-
-        <!-- 系統 -->
-        <div class="sg">
-          <div class="sg-title">系統</div>
-          <div class="sg-row">
-            <div>
-              <span class="sg-label">設為預設影片播放器</span>
-              <div class="sg-sublabel">將 mp4、mkv、avi 等影片格式關聯至本程式</div>
-            </div>
-            <button id="btn-set-default" class="btn btn-sm">前往設定</button>
-          </div>
-        </div>
-
-        <!-- 更新 -->
-        <div class="sg">
-          <div class="sg-title">更新</div>
-          <div class="sg-row">
-            <span class="sg-label">自動檢查更新</span>
-            <label class="toggle">
-              <input type="checkbox" id="auto-check-update-input">
-              <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            </label>
-          </div>
-          <div class="sg-pad" id="update-area">
-            <div id="update-state-row">
-              <div id="update-state-icon"></div>
-              <div id="update-state-texts">
-                <div id="update-status-text" class="update-status-text"></div>
-                <div id="update-error-detail" class="hidden"></div>
+            <div class="sg-row sg-row-col">
+              <div class="sg-row-top">
+                <span class="sg-label">預設音量</span>
+                <span id="vol-default-label" class="sg-label-val">70%</span>
               </div>
-              <div id="update-actions">
-                <button id="btn-check-update" class="btn btn-sm">立即檢查</button>
-                <button id="btn-download-update" class="btn btn-sm btn-accent hidden">下載更新</button>
-                <button id="btn-install-update" class="btn btn-sm btn-accent hidden">重啟並安裝</button>
+              <input id="vol-default-input" type="range" min="0" max="100" step="1" class="sg-range">
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: 速度 -->
+        <div class="sg-tab-pane" data-pane="speed">
+          <div class="sg">
+            <div class="sg-pad">
+              <div id="speed-chips"></div>
+              <div class="sg-add-row">
+                <input id="speed-input" type="number" min="0.1" max="10" step="0.25" placeholder="新增…">
+                <button id="btn-add-speed" class="btn">＋ 新增</button>
               </div>
             </div>
-            <div id="update-progress-wrap" class="hidden">
-              <div id="update-progress-track">
-                <div id="update-progress-fill"></div>
+          </div>
+        </div>
+
+        <!-- Tab: 外觀 -->
+        <div class="sg-tab-pane" data-pane="appearance">
+          <div class="sg">
+            <div class="sg-row">
+              <span class="sg-label">截圖後繼續播放</span>
+              <label class="toggle">
+                <input type="checkbox" id="resume-after-crop-input">
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              </label>
+            </div>
+            <div class="sg-row sg-row-col">
+              <div class="sg-row-top">
+                <span class="sg-label">介面透明度</span>
+                <span id="glass-opacity-label" class="sg-label-val">42%</span>
               </div>
-              <span id="update-progress-pct">0%</span>
+              <input id="glass-opacity-input" type="range" min="0" max="100" step="1" class="sg-range">
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: 系統 -->
+        <div class="sg-tab-pane" data-pane="system">
+          <div class="sg">
+            <div class="sg-row">
+              <div>
+                <span class="sg-label">設為預設影片播放器</span>
+                <div class="sg-sublabel">將 mp4、mkv、avi 等影片格式關聯至本程式</div>
+              </div>
+              <button id="btn-set-default" class="btn btn-sm">前往設定</button>
+            </div>
+            <div class="sg-row">
+              <span class="sg-label">自動檢查更新</span>
+              <label class="toggle">
+                <input type="checkbox" id="auto-check-update-input">
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              </label>
+            </div>
+            <div class="sg-pad" id="update-area">
+              <div id="update-state-row">
+                <div id="update-state-icon"></div>
+                <div id="update-state-texts">
+                  <div id="update-status-text" class="update-status-text"></div>
+                  <div id="update-error-detail" class="hidden"></div>
+                </div>
+                <div id="update-actions">
+                  <button id="btn-check-update" class="btn btn-sm">立即檢查</button>
+                  <button id="btn-download-update" class="btn btn-sm btn-accent hidden">下載更新</button>
+                  <button id="btn-install-update" class="btn btn-sm btn-accent hidden">重啟並安裝</button>
+                </div>
+              </div>
+              <div id="update-progress-wrap" class="hidden">
+                <div id="update-progress-track">
+                  <div id="update-progress-fill"></div>
+                </div>
+                <span id="update-progress-pct">0%</span>
+              </div>
             </div>
           </div>
         </div>
