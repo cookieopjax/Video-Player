@@ -755,6 +755,10 @@ function buildSpeedChips() {
 }
 
 function openSettings() {
+  // Reset to first tab
+  document.querySelectorAll('.sg-tab').forEach((t, i) => t.classList.toggle('active', i === 0))
+  document.querySelectorAll('.sg-tab-pane').forEach((p, i) => p.classList.toggle('active', i === 0))
+
   editSpeeds = [...config.speeds]
   buildSpeedChips()
   jumpInput.value = config.jumpSeconds
@@ -780,6 +784,15 @@ function closeSettings() {
 document.getElementById('btn-settings').addEventListener('click', openSettings)
 document.getElementById('btn-settings-close').addEventListener('click', closeSettings)
 settingsOverlay.addEventListener('click', (e) => { if (e.target === settingsOverlay) closeSettings() })
+
+// Tab switching
+document.getElementById('settings-tabs').addEventListener('click', (e) => {
+  const tab = e.target.closest('.sg-tab')
+  if (!tab) return
+  const pane = tab.dataset.tab
+  document.querySelectorAll('.sg-tab').forEach(t => t.classList.toggle('active', t === tab))
+  document.querySelectorAll('.sg-tab-pane').forEach(p => p.classList.toggle('active', p.dataset.pane === pane))
+})
 
 // Auto-save wiring
 document.getElementById('autoplay-input').addEventListener('change', saveNow)
