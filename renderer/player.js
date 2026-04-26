@@ -49,6 +49,8 @@ let currentSpeed       = 1.0
 let currentFilePath    = ''
 let saveTimer          = null
 let fsHideTimer        = null
+let isAutoResyncing    = false
+let lastSeekTimestamp  = 0
 let currentFolderFiles = []
 let currentFolderIndex = -1
 
@@ -72,6 +74,7 @@ function updatePlayButton() {
 
 function togglePlay() {
   if (!video.src) return
+  if (Date.now() - lastSeekTimestamp < 400) return
   const willPause = !video.paused
   triggerPlayAnim(willPause)
   willPause ? video.pause() : video.play()
@@ -86,6 +89,7 @@ video.addEventListener('ended', updatePlayButton)
 // ── Loading indicator (debounced to avoid flicker on fast seeks) ──
 let loadingTimer = null
 function showLoading()  {
+  if (isAutoResyncing) return
   clearTimeout(loadingTimer)
   loadingTimer = setTimeout(() => loadingOverlay.classList.remove('hidden'), 160)
 }
@@ -98,6 +102,24 @@ video.addEventListener('loadstart', showLoading)
 video.addEventListener('playing',   hideLoading)
 video.addEventListener('canplay',   hideLoading)
 video.addEventListener('seeked',    hideLoading)
+
+// ── AV-sync watchdog ───────────────────────────────────────────
+// Periodically force-seek to current position to flush decoder drift.
+let avResyncTimer = null
+function scheduleAvResync() {
+  clearTimeout(avResyncTimer)
+  avResyncTimer = setTimeout(() => {
+    if (!video.paused && video.src && !isDraggingProgress) {
+      isAutoResyncing = true
+      video.currentTime = video.currentTime
+      setTimeout(() => { isAutoResyncing = false }, 500)
+    }
+    scheduleAvResync()
+  }, 60000)
+}
+video.addEventListener('play',  scheduleAvResync)
+video.addEventListener('pause', () => clearTimeout(avResyncTimer))
+video.addEventListener('ended', () => clearTimeout(avResyncTimer))
 
 // ── Video error ────────────────────────────────────────────────
 video.addEventListener('error', () => {
@@ -188,9 +210,11 @@ function updateJumpLabels() {
 }
 
 document.getElementById('btn-backward').addEventListener('click', () => {
+  lastSeekTimestamp = Date.now()
   video.currentTime = clamp(video.currentTime - config.jumpSeconds, 0, video.duration || 0)
 })
 document.getElementById('btn-forward').addEventListener('click', () => {
+  lastSeekTimestamp = Date.now()
   video.currentTime = clamp(video.currentTime + config.jumpSeconds, 0, video.duration || 0)
 })
 
@@ -208,11 +232,11 @@ document.addEventListener('keydown', (e) => {
       break
     case 'ArrowLeft':
       e.preventDefault()
-      if (video.src) video.currentTime = clamp(video.currentTime - config.jumpSeconds, 0, video.duration)
+      if (video.src) { lastSeekTimestamp = Date.now(); video.currentTime = clamp(video.currentTime - config.jumpSeconds, 0, video.duration) }
       break
     case 'ArrowRight':
       e.preventDefault()
-      if (video.src) video.currentTime = clamp(video.currentTime + config.jumpSeconds, 0, video.duration)
+      if (video.src) { lastSeekTimestamp = Date.now(); video.currentTime = clamp(video.currentTime + config.jumpSeconds, 0, video.duration) }
       break
     case 'KeyF':
       e.preventDefault()
@@ -796,12 +820,22 @@ document.getElementById('btn-set-default').addEventListener('click', async () =>
 })
 
 // ── Auto-updater UI ────────────────────────────────────────────
-const updateStatusText    = document.getElementById('update-status-text')
-const updateProgressWrap  = document.getElementById('update-progress-wrap')
-const updateProgressFill  = document.getElementById('update-progress-fill')
-const btnCheckUpdate      = document.getElementById('btn-check-update')
-const btnDownloadUpdate   = document.getElementById('btn-download-update')
-const btnInstallUpdate    = document.getElementById('btn-install-update')
+const updateStateIcon    = document.getElementById('update-state-icon')
+const updateStatusText   = document.getElementById('update-status-text')
+const updateErrorDetail  = document.getElementById('update-error-detail')
+const updateProgressWrap = document.getElementById('update-progress-wrap')
+const updateProgressFill = document.getElementById('update-progress-fill')
+const updateProgressPct  = document.getElementById('update-progress-pct')
+const btnCheckUpdate     = document.getElementById('btn-check-update')
+const btnDownloadUpdate  = document.getElementById('btn-download-update')
+const btnInstallUpdate   = document.getElementById('btn-install-update')
+
+const UPD_ICONS = {
+  spinner: '<div class="upd-spinner"></div>',
+  check:   '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+  dl:      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+  warn:    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+}
 
 function setUpdateUI(state, data = {}) {
   updateProgressWrap.classList.add('hidden')
@@ -809,39 +843,65 @@ function setUpdateUI(state, data = {}) {
   btnDownloadUpdate.classList.add('hidden')
   btnInstallUpdate.classList.add('hidden')
   btnCheckUpdate.disabled = false
+  updateErrorDetail.classList.add('hidden')
+  updateErrorDetail.textContent = ''
 
   switch (state) {
     case 'checking':
-      updateStatusText.textContent = '檢查中…'
+      updateStateIcon.innerHTML = UPD_ICONS.spinner
+      updateStateIcon.className = 'upd-icon-muted'
+      updateStatusText.textContent = '正在檢查更新…'
       btnCheckUpdate.disabled = true
       break
     case 'up-to-date':
+      updateStateIcon.innerHTML = UPD_ICONS.check
+      updateStateIcon.className = 'upd-icon-ok'
       updateStatusText.textContent = data.latestVersion
-        ? `已是最新版本 v${data.latestVersion} ✓`
-        : '已是最新版本 ✓'
+        ? `已是最新版本（v${data.latestVersion}）`
+        : '已是最新版本'
       break
     case 'available':
+      updateStateIcon.innerHTML = UPD_ICONS.dl
+      updateStateIcon.className = 'upd-icon-accent'
       updateStatusText.textContent = `發現新版本 v${data.version}`
       btnCheckUpdate.classList.add('hidden')
       btnDownloadUpdate.classList.remove('hidden')
       break
-    case 'downloading':
-      updateStatusText.textContent = `下載中… ${data.percent ?? 0}%`
+    case 'downloading': {
+      const pct = data.percent ?? 0
+      updateStateIcon.innerHTML = UPD_ICONS.spinner
+      updateStateIcon.className = 'upd-icon-muted'
+      updateStatusText.textContent = '正在下載更新…'
       updateProgressWrap.classList.remove('hidden')
-      updateProgressFill.style.width = (data.percent ?? 0) + '%'
+      updateProgressFill.style.width = pct + '%'
+      updateProgressPct.textContent  = pct + '%'
       btnCheckUpdate.classList.add('hidden')
       break
+    }
     case 'downloaded':
+      updateStateIcon.innerHTML = UPD_ICONS.check
+      updateStateIcon.className = 'upd-icon-ok'
       updateStatusText.textContent = '下載完成，準備安裝'
       updateProgressFill.style.width = '100%'
+      updateProgressPct.textContent  = '100%'
       updateProgressWrap.classList.remove('hidden')
       btnCheckUpdate.classList.add('hidden')
       btnInstallUpdate.classList.remove('hidden')
       break
-    case 'error':
-      updateStatusText.textContent = `檢查失敗：${data.message ?? ''}`
+    case 'error': {
+      updateStateIcon.innerHTML = UPD_ICONS.warn
+      updateStateIcon.className = 'upd-icon-error'
+      updateStatusText.textContent = '更新檢查失敗'
+      const msg = data.message ?? ''
+      if (msg) {
+        updateErrorDetail.textContent = msg.length > 90 ? msg.slice(0, 90) + '…' : msg
+        updateErrorDetail.classList.remove('hidden')
+      }
       break
+    }
     default:
+      updateStateIcon.innerHTML = ''
+      updateStateIcon.className = ''
       updateStatusText.textContent = ''
   }
 }

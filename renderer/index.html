@@ -255,14 +255,23 @@
             </label>
           </div>
           <div class="sg-pad" id="update-area">
-            <div id="update-status-text" class="update-status-text"></div>
-            <div id="update-progress-wrap" class="hidden">
-              <div id="update-progress-fill"></div>
+            <div id="update-state-row">
+              <div id="update-state-icon"></div>
+              <div id="update-state-texts">
+                <div id="update-status-text" class="update-status-text"></div>
+                <div id="update-error-detail" class="hidden"></div>
+              </div>
+              <div id="update-actions">
+                <button id="btn-check-update" class="btn btn-sm">立即檢查</button>
+                <button id="btn-download-update" class="btn btn-sm btn-accent hidden">下載更新</button>
+                <button id="btn-install-update" class="btn btn-sm btn-accent hidden">重啟並安裝</button>
+              </div>
             </div>
-            <div id="update-actions">
-              <button id="btn-check-update" class="btn btn-sm">立即檢查</button>
-              <button id="btn-download-update" class="btn btn-sm btn-accent hidden">下載更新</button>
-              <button id="btn-install-update" class="btn btn-sm btn-accent hidden">重啟並安裝</button>
+            <div id="update-progress-wrap" class="hidden">
+              <div id="update-progress-track">
+                <div id="update-progress-fill"></div>
+              </div>
+              <span id="update-progress-pct">0%</span>
             </div>
           </div>
         </div>
