@@ -497,12 +497,12 @@ body.vol-compact #vol-icon:hover { background: var(--btn-bg); }
   background: var(--accent);
 }
 .course-ep {
-  flex-shrink: 0;
+  flex: 0 0 52px; text-align: right;
   font-size: 11px; color: var(--text); font-weight: 500;
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .course-time {
-  flex-shrink: 0;
+  flex: 0 0 46px; text-align: right;
   font-size: 10px; color: var(--text-muted);
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
