@@ -49,7 +49,6 @@ let currentSpeed       = 1.0
 let currentFilePath    = ''
 let saveTimer          = null
 let fsHideTimer        = null
-let isAutoResyncing    = false
 let lastSeekTimestamp  = 0
 let currentFolderFiles = []
 let currentFolderIndex = -1
@@ -89,7 +88,6 @@ video.addEventListener('ended', updatePlayButton)
 // ── Loading indicator (debounced to avoid flicker on fast seeks) ──
 let loadingTimer = null
 function showLoading()  {
-  if (isAutoResyncing) return
   clearTimeout(loadingTimer)
   loadingTimer = setTimeout(() => loadingOverlay.classList.remove('hidden'), 160)
 }
@@ -103,36 +101,15 @@ video.addEventListener('playing',   hideLoading)
 video.addEventListener('canplay',   hideLoading)
 video.addEventListener('seeked',    hideLoading)
 
-// ── AV-sync watchdog ───────────────────────────────────────────
-// Periodically force-seek to current position to flush decoder drift.
-let avResyncTimer = null
-function scheduleAvResync() {
-  clearTimeout(avResyncTimer)
-  avResyncTimer = setTimeout(() => {
-    if (!video.paused && video.src && !isDraggingProgress) {
-      isAutoResyncing = true
-      video.currentTime = video.currentTime
-      setTimeout(() => { isAutoResyncing = false }, 500)
-    }
-    scheduleAvResync()
-  }, 60000)
-}
-video.addEventListener('play',  scheduleAvResync)
-video.addEventListener('pause', () => clearTimeout(avResyncTimer))
-video.addEventListener('ended', () => clearTimeout(avResyncTimer))
-
 // ── Video error ────────────────────────────────────────────────
 video.addEventListener('error', () => {
   loadingOverlay.classList.add('hidden')
   const err = video.error
-  const MSG = {
-    1: '載入中止',
-    2: '網路錯誤',
-    3: '解碼失敗',
-    4: '格式不支援',
-  }
+  const MSG = { 1: '載入中止', 2: '網路錯誤', 3: '解碼失敗', 4: '格式不支援' }
   const detail = err ? (MSG[err.code] || `錯誤 ${err.code}`) : '未知錯誤'
-  showToast(`無法播放：${detail}`)
+  const full   = err?.message ? `${detail} — ${err.message}` : detail
+  console.error('[video error]', err)
+  showToast(`無法播放：${detail}`, { persistent: true, copyText: `[video error] code=${err?.code} ${full}\nfile: ${currentFilePath}` })
 })
 
 // ── Progress bar ───────────────────────────────────────────────
@@ -201,6 +178,7 @@ btnSpeed.addEventListener('click', (e) => { e.stopPropagation(); speedDropdown.c
 document.addEventListener('click', (e) => {
   speedDropdown.classList.add('hidden')
   if (!volumeWrap.contains(e.target)) volPopup.classList.add('hidden')
+  if (document.body.classList.contains('fullscreen')) showControls()
 })
 
 // ── Jump buttons + keyboard ────────────────────────────────────
@@ -220,6 +198,7 @@ document.getElementById('btn-forward').addEventListener('click', () => {
 
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return
+  if (document.body.classList.contains('fullscreen')) showControls()
   if (e.code === 'KeyO' && e.ctrlKey) {
     e.preventDefault()
     document.getElementById('btn-open').click()
@@ -470,6 +449,7 @@ function renderCoursePanel() {
   setProgress(0)
   timeDisplay.textContent = '00:00 / 00:00'
   updateNavButtons()
+  updatePlayButton()
   overlay.classList.remove('hidden')
   listEl.innerHTML = ''
 
@@ -580,14 +560,30 @@ document.getElementById('btn-close')   .addEventListener('click', () => window.e
 
 // ── Toast ──────────────────────────────────────────────────────
 let toastTimer = null
-function showToast(msg) {
-  toastEl.textContent = msg
-  toastEl.classList.remove('hidden', 'fade-out')
+let toastCopyText = null
+
+toastEl.addEventListener('click', () => {
+  if (!toastCopyText) return
+  navigator.clipboard.writeText(toastCopyText).catch(() => {})
+  toastEl.textContent = '已複製錯誤訊息'
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => {
     toastEl.classList.add('fade-out')
-    setTimeout(() => toastEl.classList.add('hidden'), 300)
-  }, 1800)
+    setTimeout(() => { toastEl.classList.add('hidden'); toastCopyText = null }, 300)
+  }, 1000)
+})
+
+function showToast(msg, { persistent = false, copyText = null } = {}) {
+  toastCopyText = copyText
+  toastEl.textContent = copyText ? msg + '（點擊複製）' : msg
+  toastEl.style.cursor = copyText ? 'pointer' : ''
+  toastEl.classList.remove('hidden', 'fade-out')
+  clearTimeout(toastTimer)
+  const delay = persistent ? 6000 : 1800
+  toastTimer = setTimeout(() => {
+    toastEl.classList.add('fade-out')
+    setTimeout(() => { toastEl.classList.add('hidden'); toastCopyText = null }, 300)
+  }, delay)
 }
 
 // ── Screenshot / Crop ──────────────────────────────────────────
