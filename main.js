@@ -3,6 +3,11 @@ const path = require('path')
 const fs   = require('fs')
 const { autoUpdater } = require('electron-updater')
 
+// Chromium 的硬體加速影片解碼在某些 GPU/驅動組合下會直接 native crash
+// (STATUS_BREAKPOINT 0x80000003)，改用軟體解碼規避
+app.commandLine.appendSwitch('disable-accelerated-video-decode')
+app.commandLine.appendSwitch('disable-accelerated-video-encode')
+
 const DEFAULTS = {
   speeds: [0.75, 1.0, 1.25, 1.5, 2.0],
   jumpSeconds: 15,
