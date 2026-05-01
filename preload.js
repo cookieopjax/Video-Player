@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   winMinimize:    () => ipcRenderer.invoke('win-minimize'),
   winMaximize:    () => ipcRenderer.invoke('win-maximize'),
   winClose:       () => ipcRenderer.invoke('win-close'),
+  copyText:       (text)  => ipcRenderer.invoke('copy-text', text),
   copyImage:      (bytes) => ipcRenderer.invoke('copy-image', bytes),
   saveConfig:     (cfg)   => ipcRenderer.invoke('save-config', cfg),
   checkUpdate:    () => ipcRenderer.invoke('check-update'),

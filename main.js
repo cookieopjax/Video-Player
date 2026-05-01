@@ -118,6 +118,11 @@ ipcMain.handle('win-minimize', () => mainWin?.minimize())
 ipcMain.handle('win-maximize', () => { mainWin?.isMaximized() ? mainWin.unmaximize() : mainWin?.maximize() })
 ipcMain.handle('win-close',    () => mainWin?.close())
 
+ipcMain.handle('copy-text', (event, text) => {
+  clipboard.writeText(String(text))
+  return { ok: true }
+})
+
 ipcMain.handle('copy-image', (event, bytes) => {
   try {
     const img = nativeImage.createFromBuffer(Buffer.from(bytes))

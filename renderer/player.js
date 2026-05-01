@@ -102,14 +102,33 @@ video.addEventListener('canplay',   hideLoading)
 video.addEventListener('seeked',    hideLoading)
 
 // ── Video error ────────────────────────────────────────────────
+let decodeRetried = false
 video.addEventListener('error', () => {
-  loadingOverlay.classList.add('hidden')
   const err = video.error
   const MSG = { 1: '載入中止', 2: '網路錯誤', 3: '解碼失敗', 4: '格式不支援' }
   const detail = err ? (MSG[err.code] || `錯誤 ${err.code}`) : '未知錯誤'
   const full   = err?.message ? `${detail} — ${err.message}` : detail
-  console.error('[video error]', err)
-  showToast(`無法播放：${detail}`, { persistent: true, copyText: `[video error] code=${err?.code} ${full}\nfile: ${currentFilePath}` })
+  console.error('[video error]', err, 'file:', currentFilePath)
+
+  // MEDIA_ERR_DECODE (3) — auto-retry once at the same position
+  if (err?.code === 3 && !decodeRetried && video.src) {
+    decodeRetried = true
+    const savedTime = video.currentTime
+    const wasPaused = video.paused
+    video.load()
+    video.addEventListener('canplay', () => {
+      if (savedTime > 0) video.currentTime = savedTime
+      if (!wasPaused) video.play().catch(() => {})
+    }, { once: true })
+    return
+  }
+
+  decodeRetried = false
+  loadingOverlay.classList.add('hidden')
+  showToast(`無法播放：${detail}`, {
+    persistent: true,
+    copyText: `[video error] code=${err?.code} ${full}\nfile: ${currentFilePath}`,
+  })
 })
 
 // ── Progress bar ───────────────────────────────────────────────
@@ -518,6 +537,7 @@ function loadFile(filePath, forcePlay = false) {
     return
   }
   currentFilePath = filePath
+  decodeRetried = false
   watchReset()
   applyFolderVolume(filePath)
   document.getElementById('recent-overlay').classList.add('hidden')
@@ -525,6 +545,7 @@ function loadFile(filePath, forcePlay = false) {
   video.src = 'file:///' + filePath.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/')
   video.playbackRate = currentSpeed
   filenameEl.innerHTML = formatPath(filePath)
+  updatePlayButton()  // 立即同步按鈕狀態，不等 play/pause event
   if (forcePlay || config.autoPlay !== false) video.play().catch(() => { /* autoplay blocked — ignored */ })
 }
 
@@ -562,15 +583,18 @@ document.getElementById('btn-close')   .addEventListener('click', () => window.e
 let toastTimer = null
 let toastCopyText = null
 
-toastEl.addEventListener('click', () => {
+toastEl.addEventListener('click', async () => {
   if (!toastCopyText) return
-  navigator.clipboard.writeText(toastCopyText).catch(() => {})
-  toastEl.textContent = '已複製錯誤訊息'
-  clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => {
-    toastEl.classList.add('fade-out')
-    setTimeout(() => { toastEl.classList.add('hidden'); toastCopyText = null }, 300)
-  }, 1000)
+  try {
+    await window.electronAPI.copyText(toastCopyText)
+    toastEl.textContent = '已複製錯誤訊息'
+    toastEl.style.cursor = ''
+    clearTimeout(toastTimer)
+    toastTimer = setTimeout(() => {
+      toastEl.classList.add('fade-out')
+      setTimeout(() => { toastEl.classList.add('hidden'); toastCopyText = null }, 300)
+    }, 1000)
+  } catch { /* ignore */ }
 })
 
 function showToast(msg, { persistent = false, copyText = null } = {}) {
