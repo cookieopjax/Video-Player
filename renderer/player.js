@@ -369,8 +369,9 @@ document.getElementById('btn-fullscreen').addEventListener('click', toggleFullsc
 
 // ── Course / folder progress ───────────────────────────────────
 // (normalizePath, getFolderPath, getFolderName, escapeHtml, getAdjacentEpisode are in utils.js)
-const COURSE_KEY        = 'courseData'
-const PROGRESS_MIN_SECS = 300   // must watch 5 minutes before committing progress
+const COURSE_KEY           = 'courseData'
+const PROGRESS_MIN_PLAY_SECS = 60    // must accumulate 60 s of play time …
+const PROGRESS_MIN_POS_RATIO = 0.15  // … AND be past 15% of the video
 
 function getCourseData() {
   try { return JSON.parse(localStorage.getItem(COURSE_KEY)) || {} } catch { return {} }
@@ -416,12 +417,18 @@ let progressCommitted = false  // true once commitCourseProgress fired for this 
 function watchPlay() {
   if (watchPlayStart === null) watchPlayStart = Date.now()
 }
+function progressConditionMet(accumSecs) {
+  if (accumSecs < PROGRESS_MIN_PLAY_SECS) return false
+  if (!video.duration || video.duration === 0) return false
+  return (video.currentTime / video.duration) > PROGRESS_MIN_POS_RATIO
+}
+
 function watchPause() {
   if (watchPlayStart !== null) {
     watchAccum += (Date.now() - watchPlayStart) / 1000
     watchPlayStart = null
   }
-  if (!progressCommitted && watchAccum >= PROGRESS_MIN_SECS) {
+  if (!progressCommitted && progressConditionMet(watchAccum)) {
     progressCommitted = true
     commitCourseProgress(currentFilePath)
   }
@@ -429,7 +436,8 @@ function watchPause() {
 // Called on timeupdate to catch continuous playback without pause
 function watchTick() {
   if (progressCommitted || watchPlayStart === null) return
-  if (watchAccum + (Date.now() - watchPlayStart) / 1000 >= PROGRESS_MIN_SECS) {
+  const totalAccum = watchAccum + (Date.now() - watchPlayStart) / 1000
+  if (progressConditionMet(totalAccum)) {
     watchPause()
   }
 }
