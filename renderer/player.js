@@ -594,15 +594,12 @@ let toastCopyText = null
 toastEl.addEventListener('click', async (e) => {
   e.stopPropagation()
   if (!toastCopyText) return
-  if (typeof window.electronAPI?.copyText !== 'function') {
-    toastEl.textContent = '複製失敗：API 不存在'
-    return
-  }
   try {
     const result = await window.electronAPI.copyText(toastCopyText)
-    if (result && result.ok === false) throw new Error(result.error || 'copyText 回傳失敗')
+    if (result && result.ok === false) throw new Error(result.error || 'copyText failed')
     toastEl.textContent = '已複製錯誤訊息'
     toastEl.style.cursor = ''
+    toastEl.style.pointerEvents = 'none'
     clearTimeout(toastTimer)
     toastTimer = setTimeout(() => {
       toastEl.classList.add('fade-out')
@@ -618,12 +615,13 @@ function showToast(msg, { persistent = false, copyText = null } = {}) {
   toastCopyText = copyText
   toastEl.textContent = copyText ? msg + '（點擊複製）' : msg
   toastEl.style.cursor = copyText ? 'pointer' : ''
+  toastEl.style.pointerEvents = copyText ? 'auto' : 'none'
   toastEl.classList.remove('hidden', 'fade-out')
   clearTimeout(toastTimer)
   const delay = persistent ? 6000 : 1800
   toastTimer = setTimeout(() => {
     toastEl.classList.add('fade-out')
-    setTimeout(() => { toastEl.classList.add('hidden'); toastCopyText = null }, 300)
+    setTimeout(() => { toastEl.classList.add('hidden'); toastCopyText = null; toastEl.style.pointerEvents = 'none' }, 300)
   }, delay)
 }
 

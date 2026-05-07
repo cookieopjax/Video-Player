@@ -753,7 +753,7 @@ body.ctrl-compact .btn-jump { padding: 6px 10px; }
   border: 1px solid var(--glass-border);
   color: var(--text); font-size: 13px; font-weight: 500;
   padding: 8px 18px; border-radius: 20px;
-  pointer-events: none; z-index: 300;
+  pointer-events: none; z-index: 300; /* JS sets auto when copyable */
   opacity: 1; transition: opacity 0.3s;
   white-space: nowrap;
 }
