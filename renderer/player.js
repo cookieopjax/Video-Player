@@ -46,9 +46,10 @@ let isDraggingProgress = false
 let isDraggingVolume   = false
 let isDraggingVolVert  = false
 let currentSpeed       = 1.0
-let currentFilePath    = ''
-let saveTimer          = null
-let fsHideTimer        = null
+let currentFilePath        = ''
+let positionSaveInterval   = null   // replaces saveTimer; fires every 5s while playing
+let fsHideTimer            = null
+let stallTimer             = null   // A/V desync recovery watchdog
 let lastSeekTimestamp  = 0
 let currentFolderFiles = []
 let currentFolderIndex = -1
@@ -145,13 +146,41 @@ function updateProgress() {
 
 video.addEventListener('timeupdate', () => {
   updateProgress()
-  if (!currentFilePath || !video.duration) return
-  clearTimeout(saveTimer)
-  saveTimer = setTimeout(() => {
-    localStorage.setItem('pos:' + currentFilePath, video.currentTime)
-  }, 4000)
   watchTick()
 })
+
+// ── Position save (every 5 s while playing; immediate on pause/end) ──
+function savePosition() {
+  if (currentFilePath && video.currentTime > 0) {
+    localStorage.setItem('pos:' + currentFilePath, video.currentTime)
+  }
+}
+function startPositionSave() {
+  clearInterval(positionSaveInterval)
+  positionSaveInterval = setInterval(savePosition, 5000)
+}
+function stopPositionSave(andSave = true) {
+  clearInterval(positionSaveInterval)
+  positionSaveInterval = null
+  if (andSave) savePosition()
+}
+video.addEventListener('play',  startPositionSave)
+video.addEventListener('pause', () => stopPositionSave(true))
+video.addEventListener('ended', () => stopPositionSave(false))
+window.addEventListener('beforeunload', savePosition)
+
+// ── A/V desync recovery: if stall lasts > 1 s on a local file, ──
+// seek back 0.5 s to force decoder resync (audio was running ahead)
+video.addEventListener('waiting', () => {
+  clearTimeout(stallTimer)
+  stallTimer = setTimeout(() => {
+    if (!video.paused && video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
+      video.currentTime = Math.max(0, video.currentTime - 0.5)
+    }
+  }, 1000)
+})
+video.addEventListener('playing', () => clearTimeout(stallTimer))
+video.addEventListener('seeked',  () => clearTimeout(stallTimer))
 
 video.addEventListener('loadedmetadata', () => {
   timeDisplay.textContent = `00:00 / ${formatTime(video.duration)}`
@@ -471,7 +500,7 @@ function renderCoursePanel() {
   currentFolderFiles = []
   currentFolderIndex = -1
   watchReset()
-  clearTimeout(saveTimer)
+  stopPositionSave(false)
   filenameEl.textContent = '尚未開啟影片'
   setProgress(0)
   timeDisplay.textContent = '00:00 / 00:00'
@@ -544,6 +573,7 @@ function loadFile(filePath, forcePlay = false) {
     showToast('不支援的格式')
     return
   }
+  stopPositionSave(false)   // stop old interval; don't overwrite new file's pos
   currentFilePath = filePath
   decodeRetried = false
   watchReset()
