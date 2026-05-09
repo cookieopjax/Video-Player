@@ -111,16 +111,19 @@ video.addEventListener('error', () => {
   const full   = err?.message ? `${detail} — ${err.message}` : detail
   console.error('[video error]', err, 'file:', currentFilePath)
 
-  // MEDIA_ERR_DECODE (3) — auto-retry once at the same position
+  // MEDIA_ERR_DECODE (3) — auto-retry, skip 3 s past the bad packet.
+  // Retrying at the exact same position just hits the same corrupt/incompatible
+  // audio/video packet again; skipping 3 s clears it.
   if (err?.code === 3 && !decodeRetried && video.src) {
     decodeRetried = true
-    const savedTime = video.currentTime
+    const skipTo   = video.currentTime + 3
     const wasPaused = video.paused
     video.load()
     video.addEventListener('canplay', () => {
-      if (savedTime > 0) video.currentTime = savedTime
+      video.currentTime = skipTo          // skip past the bad packet
       if (!wasPaused) video.play().catch(() => {})
     }, { once: true })
+    showToast('解碼失敗，自動略過 3 秒')
     return
   }
 
@@ -174,6 +177,8 @@ window.addEventListener('beforeunload', savePosition)
 video.addEventListener('waiting', () => {
   clearTimeout(stallTimer)
   stallTimer = setTimeout(() => {
+    // Don't interfere if a decode-error retry is already in progress
+    if (decodeRetried) return
     if (!video.paused && video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
       video.currentTime = Math.max(0, video.currentTime - 0.5)
     }
