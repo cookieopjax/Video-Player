@@ -111,19 +111,19 @@ video.addEventListener('error', () => {
   const full   = err?.message ? `${detail} — ${err.message}` : detail
   console.error('[video error]', err, 'file:', currentFilePath)
 
-  // MEDIA_ERR_DECODE (3) — auto-retry, skip 3 s past the bad packet.
-  // Retrying at the exact same position just hits the same corrupt/incompatible
-  // audio/video packet again; skipping 3 s clears it.
+  // MEDIA_ERR_DECODE (3) — reload and retry at same position.
+  // With FFmpeg pipeline (MediaFoundationClearPlayback disabled) this should
+  // succeed; only falls through to the error toast if the packet is
+  // genuinely unrecoverable.
   if (err?.code === 3 && !decodeRetried && video.src) {
     decodeRetried = true
-    const skipTo   = video.currentTime + 3
+    const savedTime = video.currentTime
     const wasPaused = video.paused
     video.load()
     video.addEventListener('canplay', () => {
-      video.currentTime = skipTo          // skip past the bad packet
+      if (savedTime > 0) video.currentTime = savedTime
       if (!wasPaused) video.play().catch(() => {})
     }, { once: true })
-    showToast('解碼失敗，自動略過 3 秒')
     return
   }
 
