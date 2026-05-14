@@ -103,7 +103,8 @@ video.addEventListener('canplay',   hideLoading)
 video.addEventListener('seeked',    hideLoading)
 
 // ── Video error ────────────────────────────────────────────────
-let decodeRetried = false
+// 0 = no error yet; 1 = first retry (same pos); 2 = second retry (muted)
+let decodeRetryCount = 0
 video.addEventListener('error', () => {
   const err = video.error
   const MSG = { 1: '載入中止', 2: '網路錯誤', 3: '解碼失敗', 4: '格式不支援' }
@@ -111,23 +112,33 @@ video.addEventListener('error', () => {
   const full   = err?.message ? `${detail} — ${err.message}` : detail
   console.error('[video error]', err, 'file:', currentFilePath)
 
-  // MEDIA_ERR_DECODE (3) — reload and retry at same position.
-  // With FFmpeg pipeline (MediaFoundationClearPlayback disabled) this should
-  // succeed; only falls through to the error toast if the packet is
-  // genuinely unrecoverable.
-  if (err?.code === 3 && !decodeRetried && video.src) {
-    decodeRetried = true
+  if (err?.code === 3 && decodeRetryCount < 2 && video.src) {
     const savedTime = video.currentTime
     const wasPaused = video.paused
-    video.load()
-    video.addEventListener('canplay', () => {
-      if (savedTime > 0) video.currentTime = savedTime
-      if (!wasPaused) video.play().catch(() => {})
-    }, { once: true })
+
+    if (decodeRetryCount === 0) {
+      // 第一次：靜默重試同一位置（可能是暫時性錯誤）
+      decodeRetryCount = 1
+      video.load()
+      video.addEventListener('canplay', () => {
+        if (savedTime > 0) video.currentTime = savedTime
+        if (!wasPaused) video.play().catch(() => {})
+      }, { once: true })
+    } else {
+      // 第二次：音訊徹底無法解碼，靜音繼續播影像
+      decodeRetryCount = 2
+      video.muted = true
+      video.load()
+      video.addEventListener('canplay', () => {
+        if (savedTime > 0) video.currentTime = savedTime
+        if (!wasPaused) video.play().catch(() => {})
+      }, { once: true })
+      showToast('音訊解碼失敗，已靜音繼續播放', { persistent: true })
+    }
     return
   }
 
-  decodeRetried = false
+  decodeRetryCount = 0
   loadingOverlay.classList.add('hidden')
   showToast(`無法播放：${detail}`, {
     persistent: true,
@@ -178,7 +189,7 @@ video.addEventListener('waiting', () => {
   clearTimeout(stallTimer)
   stallTimer = setTimeout(() => {
     // Don't interfere if a decode-error retry is already in progress
-    if (decodeRetried) return
+    if (decodeRetryCount > 0) return
     if (!video.paused && video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
       video.currentTime = Math.max(0, video.currentTime - 0.5)
     }
@@ -580,7 +591,8 @@ function loadFile(filePath, forcePlay = false) {
   }
   stopPositionSave(false)   // stop old interval; don't overwrite new file's pos
   currentFilePath = filePath
-  decodeRetried = false
+  decodeRetryCount = 0
+  video.muted = false       // reset muted state from any previous decode fallback
   watchReset()
   applyFolderVolume(filePath)
   document.getElementById('recent-overlay').classList.add('hidden')
