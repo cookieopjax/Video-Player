@@ -112,25 +112,36 @@ video.addEventListener('error', () => {
   const full   = err?.message ? `${detail} — ${err.message}` : detail
   console.error('[video error]', err, 'file:', currentFilePath)
 
-  if (err?.code === 3 && decodeRetryCount < 2 && video.src) {
+  if (err?.code === 3 && decodeRetryCount < 3 && video.src) {
     const savedTime = video.currentTime
     const wasPaused = video.paused
 
     if (decodeRetryCount === 0) {
-      // 第一次：靜默重試同一位置（可能是暫時性錯誤）
+      // 第一次：跳過 1 秒繞過壞封包，保留音訊
+      // （AAC timestamp 不連續造成，同位置重試必然再失敗）
       decodeRetryCount = 1
       video.load()
       video.addEventListener('canplay', () => {
-        if (savedTime > 0) video.currentTime = savedTime
+        video.currentTime = savedTime + 1
         if (!wasPaused) video.play().catch(() => {})
       }, { once: true })
-    } else {
-      // 第二次：音訊徹底無法解碼，靜音繼續播影像
+      showToast('略過損壞音訊封包（+1 秒）')
+    } else if (decodeRetryCount === 1) {
+      // 第二次：再跳 2 秒（有時壞封包連續出現）
       decodeRetryCount = 2
+      video.load()
+      video.addEventListener('canplay', () => {
+        video.currentTime = savedTime + 2
+        if (!wasPaused) video.play().catch(() => {})
+      }, { once: true })
+      showToast('再次略過，跳至 +2 秒')
+    } else {
+      // 第三次：壞封包無法繞過，靜音繼續播影像
+      decodeRetryCount = 3
       video.muted = true
       video.load()
       video.addEventListener('canplay', () => {
-        if (savedTime > 0) video.currentTime = savedTime
+        video.currentTime = savedTime
         if (!wasPaused) video.play().catch(() => {})
       }, { once: true })
       showToast('音訊解碼失敗，已靜音繼續播放', { persistent: true })
