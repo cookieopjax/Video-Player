@@ -73,12 +73,12 @@ function getAdjacentEpisode(files, currentFilePath, delta) {
 // existing: previous entry or {}; files: sorted list; currentIndex: index of current file.
 // Returns new entry object. Pure — no side-effects.
 function buildCourseEntry(existing, files, currentIndex, filePath, folderPath) {
-  const prevMaxIndex = existing.maxEpisodeIndex ?? -1
-  const newMaxIndex  = Math.max(prevMaxIndex, currentIndex)
+  // Use current episode as progress (not max-ever-watched).
+  // Progress reflects the last episode you actually watched, and can go backwards.
   return {
     folderName:      getFolderName(folderPath),
-    maxEpisodeIndex: newMaxIndex,
-    maxEpisodeFile:  currentIndex >= prevMaxIndex ? filePath : (existing.maxEpisodeFile || filePath),
+    maxEpisodeIndex: currentIndex,
+    maxEpisodeFile:  filePath,
     totalFiles:      files.length,
     playCount:       (existing.playCount || 0) + 1,
     lastAccessed:    Date.now(),

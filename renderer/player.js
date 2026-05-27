@@ -171,6 +171,7 @@ function updateProgress() {
 
 video.addEventListener('timeupdate', () => {
   updateProgress()
+  watchTick()
 })
 
 // ── Position save (every 5 s while playing; immediate on pause/end) ──
@@ -422,9 +423,11 @@ document.addEventListener('mousemove', () => {
 
 document.getElementById('btn-fullscreen').addEventListener('click', toggleFullscreen)
 
-// ── Course / folder ────────────────────────────────────────────
+// ── Course / folder progress ───────────────────────────────────
 // (normalizePath, getFolderPath, getFolderName, escapeHtml, getAdjacentEpisode are in utils.js)
-const COURSE_KEY = 'courseData'
+const COURSE_KEY             = 'courseData'
+const PROGRESS_MIN_PLAY_SECS = 60    // 累積播放 60 秒…
+const PROGRESS_MIN_POS_RATIO = 0.15  // …且播放位置 > 15%，才提交進度
 
 function getCourseData() {
   try { return JSON.parse(localStorage.getItem(COURSE_KEY)) || {} } catch { return {} }
@@ -447,6 +450,58 @@ async function loadFolderContext(filePath) {
   updateNavButtons()
 }
 
+// 提交進度：記錄「當前集」而非「最遠集」，可往回退
+function commitCourseProgress(filePath) {
+  if (!currentFolderFiles.length) return
+  const normFile = normalizePath(filePath)
+  const currentIndex = currentFolderFiles.findIndex(f => normalizePath(f) === normFile)
+  if (currentIndex < 0) return
+  const folderPath = getFolderPath(filePath)
+  if (!folderPath) return
+  const data = getCourseData()
+  data[folderPath] = buildCourseEntry(data[folderPath] || {}, currentFolderFiles, currentIndex, filePath, folderPath)
+  saveCourseData(data)
+}
+
+// ── Watch-time guard ───────────────────────────────────────────
+let watchAccum        = 0
+let watchPlayStart    = null
+let progressCommitted = false
+
+function watchPlay() {
+  if (watchPlayStart === null) watchPlayStart = Date.now()
+}
+function progressConditionMet(accumSecs) {
+  if (accumSecs < PROGRESS_MIN_PLAY_SECS) return false
+  if (!video.duration || video.duration === 0) return false
+  return (video.currentTime / video.duration) > PROGRESS_MIN_POS_RATIO
+}
+function watchPause() {
+  if (watchPlayStart !== null) {
+    watchAccum += (Date.now() - watchPlayStart) / 1000
+    watchPlayStart = null
+  }
+  if (!progressCommitted && progressConditionMet(watchAccum)) {
+    progressCommitted = true
+    commitCourseProgress(currentFilePath)
+  }
+}
+function watchTick() {
+  if (progressCommitted || watchPlayStart === null) return
+  if (progressConditionMet(watchAccum + (Date.now() - watchPlayStart) / 1000)) {
+    watchPause()
+  }
+}
+function watchReset() {
+  watchAccum = 0
+  watchPlayStart = null
+  progressCommitted = false
+}
+
+video.addEventListener('play',  watchPlay)
+video.addEventListener('pause', watchPause)
+video.addEventListener('ended', watchPause)
+
 function updateNavButtons() {
   document.getElementById('btn-prev').disabled = currentFolderIndex <= 0
   document.getElementById('btn-next').disabled =
@@ -466,6 +521,7 @@ function renderCoursePanel() {
   currentFilePath    = ''
   currentFolderFiles = []
   currentFolderIndex = -1
+  watchReset()
   stopPositionSave(false)
   filenameEl.textContent = '尚未開啟影片'
   setProgress(0)
@@ -542,7 +598,8 @@ function loadFile(filePath, forcePlay = false) {
   stopPositionSave(false)   // stop old interval; don't overwrite new file's pos
   currentFilePath = filePath
   decodeRetryCount = 0
-  video.muted = false       // reset muted state from any previous decode fallback
+  video.muted = false
+  watchReset()
   applyFolderVolume(filePath)
   document.getElementById('recent-overlay').classList.add('hidden')
   loadFolderContext(filePath)  // fire-and-forget, updates nav buttons
