@@ -321,7 +321,7 @@ describe('buildCourseEntry', () => {
     expect(entry.folderName).toBe('v')
   })
 
-  test('advances maxEpisodeIndex when watching further episode', () => {
+  test('updates to the current episode (progress can advance)', () => {
     const prev  = buildCourseEntry({}, files, 1, '/v/ep2.mp4', folder)
     const entry = buildCourseEntry(prev, files, 2, '/v/ep3.mp4', folder)
     expect(entry.maxEpisodeIndex).toBe(2)
@@ -329,14 +329,16 @@ describe('buildCourseEntry', () => {
     expect(entry.playCount).toBe(2)
   })
 
-  test('does NOT retreat maxEpisodeIndex when going back to earlier episode', () => {
+  test('tracks current episode — progress can retreat when rewatching earlier episode', () => {
+    // New behaviour: progress follows the last episode you actually watched,
+    // so going back to ep1 after ep3 sets the index to 0 (not locked at 2).
     const prev  = buildCourseEntry({}, files, 2, '/v/ep3.mp4', folder)
     const entry = buildCourseEntry(prev, files, 0, '/v/ep1.mp4', folder)
-    expect(entry.maxEpisodeIndex).toBe(2)
-    expect(entry.maxEpisodeFile).toBe('/v/ep3.mp4')
+    expect(entry.maxEpisodeIndex).toBe(0)
+    expect(entry.maxEpisodeFile).toBe('/v/ep1.mp4')
   })
 
-  test('keeps maxEpisodeFile when re-watching the same max episode', () => {
+  test('keeps episode when re-watching the same episode', () => {
     const prev  = buildCourseEntry({}, files, 2, '/v/ep3.mp4', folder)
     const entry = buildCourseEntry(prev, files, 2, '/v/ep3.mp4', folder)
     expect(entry.maxEpisodeIndex).toBe(2)
