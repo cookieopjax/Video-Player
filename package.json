@@ -1,6 +1,6 @@
 {
   "name": "video-player",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "description": "Personal video player",
   "main": "main.js",
   "scripts": {
