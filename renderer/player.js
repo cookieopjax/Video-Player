@@ -201,7 +201,10 @@ video.addEventListener('waiting', () => {
   stallTimer = setTimeout(() => {
     // Don't interfere if a decode-error retry is already in progress
     if (decodeRetryCount > 0) return
-    if (!video.paused && video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
+    // Guard: currentTime must be > 0 — prevents firing during initial load on a cold
+    // media pipeline (second instance, first open), which would seek back to 0 and
+    // loop forever (waiting → stall → seek(0) → waiting → …)
+    if (!video.paused && video.currentTime > 0 && video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
       video.currentTime = Math.max(0, video.currentTime - 0.5)
     }
   }, 1000)
@@ -596,6 +599,8 @@ function loadFile(filePath, forcePlay = false) {
     return
   }
   stopPositionSave(false)   // stop old interval; don't overwrite new file's pos
+  clearTimeout(stallTimer)  // discard any stall-recovery timer left over from prev state
+  stallTimer = null
   currentFilePath = filePath
   decodeRetryCount = 0
   video.muted = false
