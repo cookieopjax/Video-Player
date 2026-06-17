@@ -134,9 +134,10 @@ video.addEventListener('error', () => {
     clearTimeout(stallTimer)
     stallTimer = null
 
-    // Fix 6: mute fallback also skips +0.5 s to avoid re-hitting the same bad packet
-    const seekTarget = decodeRetryCount === 3 ? savedTime + 0.5 : savedTime + decodeRetryCount
-    if (decodeRetryCount === 3) {
+    // mute fallback also skips +0.5 s to avoid re-hitting the same bad packet
+    const shouldMute  = decodeRetryCount === 3
+    const seekTarget  = shouldMute ? savedTime + 0.5 : savedTime + decodeRetryCount
+    if (shouldMute) {
       video.muted = true
       showToast('音訊解碼失敗，已靜音繼續播放', { persistent: true })
     } else {
@@ -144,8 +145,10 @@ video.addEventListener('error', () => {
     }
 
     video.load()
+    // NOTE: video.load() resets both playbackRate → defaultPlaybackRate (1.0)
+    // and muted → defaultMuted (false); both are restored in the canplay handler.
 
-    // Fix 2: if canplay never arrives (completely broken file), give up after 8 s
+    // if canplay never arrives (completely broken file), give up after 8 s
     decodeCanplayTimeout = setTimeout(() => {
       cancelDecodeRetry()
       hideLoading()
@@ -154,6 +157,11 @@ video.addEventListener('error', () => {
 
     decodeCanplayHandler = () => {
       cancelDecodeRetry()
+      video.playbackRate = currentSpeed   // restore: video.load() reset to defaultPlaybackRate
+      if (shouldMute) {
+        video.muted = true                // restore: video.load() reset to defaultMuted=false
+        volIcon.textContent = '🔇'
+      }
       video.currentTime = seekTarget
       if (!wasPaused) video.play().catch(() => {})
     }
@@ -538,7 +546,9 @@ function renderCoursePanel() {
   hideLoading()
   video.pause()
   video.removeAttribute('src')
-  video.load()
+  // Intentionally NOT calling video.load() here: it fires loadstart → showLoading,
+  // which puts a spinner on top of the course panel with no event to clear it.
+  // Setting video.src in the next loadFile() call properly reinitialises the decoder.
   currentFilePath    = ''
   currentFolderFiles = []
   currentFolderIndex = -1
@@ -623,6 +633,7 @@ function loadFile(filePath, forcePlay = false) {
   currentFilePath = filePath
   decodeRetryCount = 0
   video.muted = false
+  volIcon.textContent = '🔊'  // sync icon: decode-error mute may have left it as 🔇
   watchReset()
   applyFolderVolume(filePath)
   document.getElementById('recent-overlay').classList.add('hidden')
@@ -752,10 +763,28 @@ async function finalizeCrop(x1, y1, x2, y2) {
   const rw = Math.abs(x2 - x1), rh = Math.abs(y2 - y1)
   if (rw < 4 || rh < 4) return
 
-  const scaleX = video.videoWidth  / cropCanvas.width
-  const scaleY = video.videoHeight / cropCanvas.height
-  const sx = rx * scaleX, sy = ry * scaleY
-  const sw = rw * scaleX, sh = rh * scaleY
+  // Calculate actual rendered bounds of the video content within the canvas.
+  // The <video> element fills the container but renders with contain-like behaviour,
+  // so a 4:3 video in a 16:9 window has pillarbox bars that must be subtracted.
+  const vw = video.videoWidth, vh = video.videoHeight
+  const cw = cropCanvas.width,  ch = cropCanvas.height
+  let displayedW, displayedH, offsetX, offsetY
+  if (vw / vh > cw / ch) {
+    // Letterbox (bars top/bottom)
+    displayedW = cw; displayedH = cw * vh / vw
+    offsetX = 0;     offsetY = (ch - displayedH) / 2
+  } else {
+    // Pillarbox (bars left/right) — typical for 4:3 content
+    displayedH = ch; displayedW = ch * vw / vh
+    offsetX = (cw - displayedW) / 2; offsetY = 0
+  }
+  const scaleX = vw / displayedW
+  const scaleY = vh / displayedH
+  const sx = clamp((rx - offsetX) * scaleX, 0, vw)
+  const sy = clamp((ry - offsetY) * scaleY, 0, vh)
+  const sw = clamp(rw * scaleX, 0, vw - sx)
+  const sh = clamp(rh * scaleY, 0, vh - sy)
+  if (sw < 1 || sh < 1) return  // entire selection was in the black bars
 
   const offscreen = document.createElement('canvas')
   offscreen.width = Math.round(sw); offscreen.height = Math.round(sh)
