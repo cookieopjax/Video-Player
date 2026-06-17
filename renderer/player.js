@@ -103,8 +103,19 @@ video.addEventListener('canplay',   hideLoading)
 video.addEventListener('seeked',    hideLoading)
 
 // ── Video error ────────────────────────────────────────────────
-// 0 = no error yet; 1 = first retry (same pos); 2 = second retry (muted)
-let decodeRetryCount = 0
+let decodeRetryCount     = 0
+let decodeCanplayHandler = null  // single reference — prevents listener accumulation
+let decodeCanplayTimeout = null  // safety net if canplay never fires
+
+function cancelDecodeRetry() {
+  if (decodeCanplayHandler) {
+    video.removeEventListener('canplay', decodeCanplayHandler)
+    decodeCanplayHandler = null
+  }
+  clearTimeout(decodeCanplayTimeout)
+  decodeCanplayTimeout = null
+}
+
 video.addEventListener('error', () => {
   const err = video.error
   const MSG = { 1: '載入中止', 2: '網路錯誤', 3: '解碼失敗', 4: '格式不支援' }
@@ -115,42 +126,44 @@ video.addEventListener('error', () => {
   if (err?.code === 3 && decodeRetryCount < 3 && video.src) {
     const savedTime = video.currentTime
     const wasPaused = video.paused
+    decodeRetryCount++
 
-    if (decodeRetryCount === 0) {
-      // 第一次：跳過 1 秒繞過壞封包，保留音訊
-      // （AAC timestamp 不連續造成，同位置重試必然再失敗）
-      decodeRetryCount = 1
-      video.load()
-      video.addEventListener('canplay', () => {
-        video.currentTime = savedTime + 1
-        if (!wasPaused) video.play().catch(() => {})
-      }, { once: true })
-      showToast('略過損壞音訊封包（+1 秒）')
-    } else if (decodeRetryCount === 1) {
-      // 第二次：再跳 2 秒（有時壞封包連續出現）
-      decodeRetryCount = 2
-      video.load()
-      video.addEventListener('canplay', () => {
-        video.currentTime = savedTime + 2
-        if (!wasPaused) video.play().catch(() => {})
-      }, { once: true })
-      showToast('再次略過，跳至 +2 秒')
-    } else {
-      // 第三次：壞封包無法繞過，靜音繼續播影像
-      decodeRetryCount = 3
+    // Fix 1+2: remove any previous pending listener before adding a new one
+    cancelDecodeRetry()
+    // Fix 3: prevent stall-recovery from interfering during the reload cycle
+    clearTimeout(stallTimer)
+    stallTimer = null
+
+    // Fix 6: mute fallback also skips +0.5 s to avoid re-hitting the same bad packet
+    const seekTarget = decodeRetryCount === 3 ? savedTime + 0.5 : savedTime + decodeRetryCount
+    if (decodeRetryCount === 3) {
       video.muted = true
-      video.load()
-      video.addEventListener('canplay', () => {
-        video.currentTime = savedTime
-        if (!wasPaused) video.play().catch(() => {})
-      }, { once: true })
       showToast('音訊解碼失敗，已靜音繼續播放', { persistent: true })
+    } else {
+      showToast(decodeRetryCount === 1 ? '略過損壞音訊封包（+1 秒）' : '再次略過，跳至 +2 秒')
     }
+
+    video.load()
+
+    // Fix 2: if canplay never arrives (completely broken file), give up after 8 s
+    decodeCanplayTimeout = setTimeout(() => {
+      cancelDecodeRetry()
+      hideLoading()
+      showToast('解碼失敗，無法繼續播放', { persistent: true })
+    }, 8000)
+
+    decodeCanplayHandler = () => {
+      cancelDecodeRetry()
+      video.currentTime = seekTarget
+      if (!wasPaused) video.play().catch(() => {})
+    }
+    video.addEventListener('canplay', decodeCanplayHandler)
     return
   }
 
+  cancelDecodeRetry()
   decodeRetryCount = 0
-  loadingOverlay.classList.add('hidden')
+  hideLoading()
   showToast(`無法播放：${detail}`, {
     persistent: true,
     copyText: `[video error] code=${err?.code} ${full}\nfile: ${currentFilePath}`,
@@ -518,6 +531,11 @@ function renderCoursePanel() {
   const data    = getCourseData()
   const courses = Object.values(data)
 
+  // Fix 4+5: cancel any pending decode retry and clear loading spinner
+  cancelDecodeRetry()
+  clearTimeout(stallTimer)
+  stallTimer = null
+  hideLoading()
   video.pause()
   video.removeAttribute('src')
   video.load()
@@ -599,6 +617,7 @@ function loadFile(filePath, forcePlay = false) {
     return
   }
   stopPositionSave(false)   // stop old interval; don't overwrite new file's pos
+  cancelDecodeRetry()       // Fix 4: discard any orphaned canplay handler from decode retry
   clearTimeout(stallTimer)  // discard any stall-recovery timer left over from prev state
   stallTimer = null
   currentFilePath = filePath
