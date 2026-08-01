@@ -12,6 +12,16 @@ app.commandLine.appendSwitch('disable-accelerated-video-encode')
 // 與 VLC/MPV 相同的解碼後端，相容性大幅提升。
 app.commandLine.appendSwitch('disable-features', 'MediaFoundationClearPlayback')
 
+// Allow multiple instances to coexist.
+// Each instance is a separate Chromium process; if they share the same userData
+// path, the second instance cannot acquire Chromium's profile lock and the
+// media pipeline silently fails — videos open but refuse to play.
+// Fix: non-primary instances get a PID-scoped userData directory so there is
+// no lock contention.  Must run before app.whenReady().
+if (!app.requestSingleInstanceLock()) {
+  app.setPath('userData', app.getPath('userData') + '-' + process.pid)
+}
+
 const DEFAULTS = {
   speeds: [0.75, 1.0, 1.25, 1.5, 2.0],
   jumpSeconds: 15,

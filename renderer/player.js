@@ -324,6 +324,10 @@ document.addEventListener('keydown', (e) => {
       e.preventDefault()
       startCrop()
       break
+    case 'KeyR':
+      e.preventDefault()
+      resyncVideo()
+      break
   }
 })
 
@@ -833,6 +837,30 @@ document.addEventListener('keydown', (e) => {
 })
 
 document.getElementById('btn-screenshot').addEventListener('click', startCrop)
+
+// ── A/V resync ─────────────────────────────────────────────────
+// Full decoder reload at the current position. Clears audio/video buffer
+// desync that occasional stalls can cause.
+function resyncVideo() {
+  if (!currentFilePath || !video.duration) return
+  const savedTime = video.currentTime
+  const wasPaused = video.paused
+  const wasMuted  = video.muted
+  cancelDecodeRetry()
+  clearTimeout(stallTimer)
+  stallTimer = null
+  stopPositionSave(false)
+  video.load()
+  video.addEventListener('canplay', () => {
+    video.playbackRate = currentSpeed
+    video.muted = wasMuted
+    video.currentTime = savedTime
+    if (!wasPaused) video.play().catch(() => {})
+    showToast('已重新同步')
+  }, { once: true })
+}
+
+document.getElementById('btn-resync').addEventListener('click', resyncVideo)
 
 // ── Settings panel ─────────────────────────────────────────────
 let editSpeeds    = []
