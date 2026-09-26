@@ -1,4 +1,7 @@
-const { createRecoveryPolicy } = require('../renderer/media-recovery')
+const {
+  createRecoveryPolicy,
+  createMediaRecoveryController,
+} = require('../renderer/media-recovery')
 
 describe('createRecoveryPolicy', () => {
   test('a decode error requests one restart just ahead with audio disabled', () => {
@@ -85,5 +88,167 @@ describe('createRecoveryPolicy', () => {
       targetTime: 26.25,
       audioEnabled: true,
     })
+  })
+})
+
+function createFakeMedia({ withAudioTracks = true } = {}) {
+  const listeners = new Map()
+  const addedListeners = []
+  const media = {
+    currentTime: 10,
+    paused: false,
+    playbackRate: 1.5,
+    muted: false,
+    readyState: 1,
+    error: null,
+    loadCount: 0,
+    playCount: 0,
+    load() { this.loadCount++ },
+    play() { this.playCount++; return Promise.resolve() },
+    addEventListener(type, listener) {
+      if (!listeners.has(type)) listeners.set(type, new Set())
+      listeners.get(type).add(listener)
+      addedListeners.push({ type, listener })
+    },
+    removeEventListener(type, listener) {
+      listeners.get(type)?.delete(listener)
+    },
+    emit(type) {
+      for (const listener of [...(listeners.get(type) || [])]) listener()
+    },
+    listenerCount(type) { return listeners.get(type)?.size || 0 },
+    lastAdded(type) { return [...addedListeners].reverse().find(item => item.type === type)?.listener },
+  }
+  if (withAudioTracks) media.audioTracks = [{ enabled: true }]
+  return media
+}
+
+function createFakeTimers() {
+  let nextId = 1
+  const pending = new Map()
+  return {
+    setTimeout(fn, delay) {
+      const id = nextId++
+      pending.set(id, { fn, delay })
+      return id
+    },
+    clearTimeout(id) { pending.delete(id) },
+    runDelay(delay) {
+      const match = [...pending.entries()].find(([, item]) => item.delay === delay)
+      if (!match) throw new Error(`No pending timer for ${delay}ms`)
+      pending.delete(match[0])
+      match[1].fn()
+    },
+  }
+}
+
+describe('createMediaRecoveryController', () => {
+  test('reloads once, disables audio, restores playback state, and resumes', () => {
+    const media = createFakeMedia()
+    const actions = []
+    const controller = createMediaRecoveryController({
+      media,
+      timers: createFakeTimers(),
+      onAction: action => actions.push(action),
+    })
+    controller.beginSource()
+
+    controller.handleError({ code: 3 })
+    expect(media.loadCount).toBe(1)
+    expect(media.audioTracks[0].enabled).toBe(false)
+
+    media.playbackRate = 1
+    media.emit('canplay')
+
+    expect(media.currentTime).toBe(10.25)
+    expect(media.playbackRate).toBe(1.5)
+    expect(media.playCount).toBe(1)
+    expect(media.audioTracks[0].enabled).toBe(false)
+    expect(controller.snapshot().mode).toBe('video-only')
+  })
+
+  test('ignores a stale callback after a new source begins', () => {
+    const media = createFakeMedia()
+    const controller = createMediaRecoveryController({ media, timers: createFakeTimers() })
+    controller.beginSource()
+    controller.handleError({ code: 3 })
+    const staleCanplay = media.lastAdded('canplay')
+
+    controller.beginSource()
+    media.currentTime = 3
+    staleCanplay()
+
+    expect(media.currentTime).toBe(3)
+    expect(media.playCount).toBe(0)
+    expect(controller.snapshot().mode).toBe('normal')
+  })
+
+  test('an eight-second restart timeout clears listeners and fails safely', () => {
+    const media = createFakeMedia()
+    const timers = createFakeTimers()
+    const actions = []
+    const controller = createMediaRecoveryController({ media, timers, onAction: action => actions.push(action) })
+    controller.beginSource()
+    controller.handleError({ code: 3 })
+
+    timers.runDelay(8000)
+
+    expect(media.listenerCount('canplay')).toBe(0)
+    expect(actions.at(-1)).toEqual({ type: 'failed', reason: 'restart-timeout' })
+    media.emit('canplay')
+    expect(media.playCount).toBe(0)
+  })
+
+  test('missing audioTracks fails safely without starting a reload loop', () => {
+    const media = createFakeMedia({ withAudioTracks: false })
+    const actions = []
+    const controller = createMediaRecoveryController({
+      media,
+      timers: createFakeTimers(),
+      onAction: action => actions.push(action),
+    })
+    controller.beginSource()
+
+    controller.handleError({ code: 3 })
+    controller.handleError({ code: 3 })
+
+    expect(media.loadCount).toBe(0)
+    expect(actions.at(-1)).toEqual({ type: 'failed', reason: 'audio-tracks-unavailable' })
+  })
+
+  test('an error while already video-only does not recursively reload', () => {
+    const media = createFakeMedia()
+    const actions = []
+    const controller = createMediaRecoveryController({
+      media,
+      timers: createFakeTimers(),
+      onAction: action => actions.push(action),
+    })
+    controller.beginSource()
+    controller.handleError({ code: 3 })
+    media.emit('canplay')
+
+    controller.handleError({ code: 3 })
+
+    expect(media.loadCount).toBe(1)
+    expect(actions.at(-1)).toEqual({ type: 'failed', reason: 'video-decode-failed' })
+  })
+
+  test('user mute remains independent while recovery disables and probes audio', () => {
+    const media = createFakeMedia()
+    const controller = createMediaRecoveryController({ media, timers: createFakeTimers() })
+    controller.beginSource()
+    controller.setUserMuted(true)
+    controller.handleError({ code: 3 })
+    media.emit('canplay')
+
+    media.currentTime = 16.25
+    controller.handleTimeUpdate()
+
+    expect(media.audioTracks[0].enabled).toBe(true)
+    expect(media.muted).toBe(true)
+    controller.setUserMuted(false)
+    expect(media.muted).toBe(false)
+    expect(media.audioTracks[0].enabled).toBe(true)
   })
 })

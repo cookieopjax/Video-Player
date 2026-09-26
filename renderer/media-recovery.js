@@ -96,4 +96,207 @@ function createRecoveryPolicy() {
   return { reset, decodeError, stall, progress, restartSucceeded, restartFailed, snapshot }
 }
 
-if (typeof module !== 'undefined') module.exports = { createRecoveryPolicy }
+function createMediaRecoveryController({
+  media,
+  timers = { setTimeout, clearTimeout },
+  onAction = () => {},
+}) {
+  const policy = createRecoveryPolicy()
+  let session = 0
+  let active = false
+  let terminal = false
+  let userMuted = false
+  let waitingTimer = null
+  let restart = null
+
+  function setAudioEnabled(enabled) {
+    const tracks = media.audioTracks
+    if (!tracks || typeof tracks.length !== 'number' || tracks.length === 0) {
+      return enabled
+    }
+    for (let index = 0; index < tracks.length; index++) tracks[index].enabled = enabled
+    return true
+  }
+
+  function clearWaitingTimer() {
+    if (waitingTimer !== null) timers.clearTimeout(waitingTimer)
+    waitingTimer = null
+  }
+
+  function clearRestart() {
+    if (!restart) return
+    media.removeEventListener('canplay', restart.canplay)
+    timers.clearTimeout(restart.timeout)
+    restart = null
+  }
+
+  function fail(reason) {
+    clearRestart()
+    clearWaitingTimer()
+    terminal = true
+    onAction({ type: 'failed', reason })
+  }
+
+  function performRestart(action) {
+    if (!active || terminal || restart) return
+    if (!action.audioEnabled && !setAudioEnabled(false)) {
+      policy.restartFailed(media.currentTime)
+      fail('audio-tracks-unavailable')
+      return
+    }
+
+    const token = session
+    const wasPaused = media.paused
+    const playbackRate = media.playbackRate
+
+    const canplay = () => {
+      if (token !== session || !active || terminal || restart?.canplay !== canplay) return
+      clearRestart()
+      if (!action.audioEnabled && !setAudioEnabled(false)) {
+        policy.restartFailed(media.currentTime)
+        fail('audio-tracks-unavailable')
+        return
+      }
+      if (action.audioEnabled) setAudioEnabled(true)
+      media.playbackRate = playbackRate
+      media.muted = userMuted
+      media.currentTime = action.targetTime
+      const policyAction = policy.restartSucceeded(action.targetTime, action.audioEnabled)
+      if (policyAction) onAction(policyAction)
+      if (!wasPaused) {
+        const playResult = media.play()
+        playResult?.catch?.(() => {})
+      }
+    }
+
+    const timeout = timers.setTimeout(() => {
+      if (token !== session || restart?.canplay !== canplay) return
+      clearRestart()
+      policy.restartFailed(media.currentTime)
+      fail('restart-timeout')
+    }, 8000)
+
+    restart = { canplay, timeout }
+    media.addEventListener('canplay', canplay)
+    onAction(action)
+    media.load()
+  }
+
+  function beginSource() {
+    session++
+    active = true
+    terminal = false
+    clearWaitingTimer()
+    clearRestart()
+    policy.reset()
+    setAudioEnabled(true)
+    media.muted = userMuted
+  }
+
+  function cancel() {
+    session++
+    active = false
+    clearWaitingTimer()
+    clearRestart()
+    policy.reset()
+  }
+
+  function handleError(error = media.error) {
+    if (!active || terminal) return
+    if (error?.code !== 3) {
+      fail('media-error')
+      return
+    }
+
+    const mode = policy.snapshot().mode
+    if (mode === 'restarting') return
+    if (mode === 'video-only') {
+      fail('video-decode-failed')
+      return
+    }
+    if (mode === 'probing-audio') {
+      setAudioEnabled(false)
+      const fallback = policy.restartFailed(media.currentTime)
+      onAction(fallback)
+      performRestart({
+        type: 'restart',
+        targetTime: media.currentTime + 0.25,
+        audioEnabled: false,
+      })
+      return
+    }
+
+    performRestart(policy.decodeError(media.currentTime))
+  }
+
+  function handleWaiting() {
+    if (!active || terminal || waitingTimer !== null) return
+    const token = session
+    waitingTimer = timers.setTimeout(() => {
+      waitingTimer = null
+      if (token !== session || !active || terminal) return
+      if (media.paused || media.currentTime <= 0 || media.readyState >= 3) return
+      performRestart(policy.stall(media.currentTime))
+    }, 1000)
+  }
+
+  function handlePlaying() {
+    clearWaitingTimer()
+  }
+
+  function handlePause() {
+    clearWaitingTimer()
+  }
+
+  function handleTimeUpdate() {
+    if (!active || terminal) return
+    const action = policy.progress(media.currentTime)
+    if (!action) return
+    if (action.type === 'probe-audio') {
+      if (!setAudioEnabled(true)) {
+        const fallback = policy.restartFailed(media.currentTime)
+        onAction(fallback)
+        return
+      }
+    }
+    onAction(action)
+  }
+
+  function resync() {
+    if (!active || terminal || restart) return
+    const mode = policy.snapshot().mode
+    performRestart({
+      type: 'restart',
+      targetTime: media.currentTime,
+      audioEnabled: mode !== 'video-only',
+    })
+  }
+
+  function setUserMuted(muted) {
+    userMuted = !!muted
+    media.muted = userMuted
+  }
+
+  function snapshot() {
+    const current = policy.snapshot()
+    return terminal ? { ...current, mode: 'failed' } : current
+  }
+
+  return {
+    beginSource,
+    cancel,
+    handleError,
+    handleWaiting,
+    handlePlaying,
+    handlePause,
+    handleTimeUpdate,
+    resync,
+    setUserMuted,
+    snapshot,
+  }
+}
+
+if (typeof module !== 'undefined') module.exports = {
+  createRecoveryPolicy,
+  createMediaRecoveryController,
+}
