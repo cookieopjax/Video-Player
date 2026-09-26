@@ -55,6 +55,8 @@ function readConfig() {
   }
 }
 
+let config = readConfig()
+
 // ── Auto-updater ───────────────────────────────────────────────
 autoUpdater.autoDownload         = false
 autoUpdater.autoInstallOnAppQuit = false
@@ -104,7 +106,7 @@ if (hasSingleInstanceLock) {
     if (app.isPackaged) {
       setTimeout(() => {
         try {
-          if (readConfig().autoCheckUpdate !== false) autoUpdater.checkForUpdates()
+          if (config.autoCheckUpdate !== false) autoUpdater.checkForUpdates()
         } catch { /* ignore */ }
       }, 3000)
     }
@@ -113,7 +115,7 @@ if (hasSingleInstanceLock) {
 app.on('window-all-closed', () => app.quit())
 
 // ── IPC handlers ───────────────────────────────────────────────
-ipcMain.handle('get-config',  () => readConfig())
+ipcMain.handle('get-config',  () => config)
 ipcMain.handle('get-version', () => app.getVersion())
 
 ipcMain.handle('open-file', async (event) => {
@@ -158,6 +160,8 @@ ipcMain.handle('save-config', (event, newConfig) => {
     const configPath = getConfigPath()
     fs.mkdirSync(path.dirname(configPath), { recursive: true })
     fs.writeFileSync(configPath, JSON.stringify(newConfig, null, 2))
+    config = newConfig
+    windowManager.broadcast('config-updated', config, event.sender)
     return { ok: true }
   } catch (err) {
     console.error('[save-config]', err)

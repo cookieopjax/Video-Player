@@ -16,6 +16,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateStatus: (cb) => {
     ipcRenderer.on('update-status', (_, status) => cb(status))
   },
+  onConfigUpdated: (cb) => {
+    const listener = (_, config) => cb(config)
+    ipcRenderer.on('config-updated', listener)
+    return () => ipcRenderer.removeListener('config-updated', listener)
+  },
   onFileArg: (cb) => {
     ipcRenderer.on('open-file-arg', (_, filePath) => cb(filePath))
   },

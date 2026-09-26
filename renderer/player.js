@@ -57,6 +57,7 @@ let currentVolumePercent = 70
 let audioContext         = null
 let mediaSourceNode      = null
 let gainNode             = null
+const configSync         = createConfigSync({ normalizeConfig, applyConfig: applySharedConfig })
 
 // ── Play/pause animation ───────────────────────────────────────
 const SVG_PLAY  = '<polygon points="5,3 19,12 5,21" fill="white"/>'
@@ -927,15 +928,35 @@ function applyGlassOpacity(pct) {
   document.documentElement.style.setProperty('--glass-alpha', (pct / 100).toFixed(2))
 }
 
+function syncSettingsForm() {
+  editSpeeds = [...config.speeds]
+  buildSpeedChips()
+  jumpInput.value = config.jumpSeconds
+  volDefaultInput.value = config.defaultVolume
+  volDefaultLabel.textContent = config.defaultVolume + '%'
+  document.getElementById('autoplay-input').checked = config.autoPlay !== false
+  document.getElementById('resume-after-crop-input').checked = !!config.resumeAfterCrop
+  document.getElementById('auto-check-update-input').checked = config.autoCheckUpdate !== false
+  document.getElementById('hide-delay-input').value = config.hideDelay ?? 3
+  glassOpacityInput.value = config.glassOpacity
+  glassOpacityLabel.textContent = config.glassOpacity + '%'
+}
+
+function applySharedConfig(nextConfig) {
+  config = nextConfig
+  buildSpeedMenu()
+  updateJumpLabels()
+  applyGlassOpacity(config.glassOpacity)
+  if (!settingsOverlay.classList.contains('hidden')) syncSettingsForm()
+}
+
 async function autoSave() {
   if (!editSpeeds.length) return
   const newConfig = collectConfig()
   try {
     const result = await window.electronAPI.saveConfig(newConfig)
     if (result && result.ok === false) throw new Error(result.error)
-    config = newConfig
-    buildSpeedMenu()
-    updateJumpLabels()
+    configSync.update(newConfig)
   } catch (err) {
     console.error('[autoSave]', err)
     showToast('儲存失敗')
@@ -972,17 +993,7 @@ function openSettings() {
   document.querySelectorAll('.sg-tab').forEach((t, i) => t.classList.toggle('active', i === 0))
   document.querySelectorAll('.sg-tab-pane').forEach((p, i) => p.classList.toggle('active', i === 0))
 
-  editSpeeds = [...config.speeds]
-  buildSpeedChips()
-  jumpInput.value = config.jumpSeconds
-  volDefaultInput.value = config.defaultVolume
-  volDefaultLabel.textContent = config.defaultVolume + '%'
-  document.getElementById('autoplay-input').checked = config.autoPlay !== false
-  document.getElementById('resume-after-crop-input').checked = !!config.resumeAfterCrop
-  document.getElementById('auto-check-update-input').checked = config.autoCheckUpdate !== false
-  document.getElementById('hide-delay-input').value = config.hideDelay ?? 3
-  glassOpacityInput.value = config.glassOpacity
-  glassOpacityLabel.textContent = config.glassOpacity + '%'
+  syncSettingsForm()
   settingsOverlay.classList.remove('hidden')
   requestAnimationFrame(() => settingsOverlay.classList.add('visible'))
 }
@@ -1146,6 +1157,10 @@ window.electronAPI.onUpdateStatus((status) => {
   setUpdateUI(status.state, status)
 })
 
+window.electronAPI.onConfigUpdated((nextConfig) => {
+  configSync.update(nextConfig)
+})
+
 // ── Open via file association / double-click ───────────────────
 window.electronAPI.onFileArg((filePath) => {
   loadFile(filePath, true)
@@ -1155,10 +1170,10 @@ window.electronAPI.onFileArg((filePath) => {
 async function init() {
   try {
     const raw = await window.electronAPI.getConfig()
-    config = normalizeConfig(raw)
+    configSync.update(raw)
   } catch (err) {
     console.error('[init] getConfig failed, using defaults', err)
-    config = normalizeConfig(null)
+    configSync.update(null)
   }
 
   // Restore saved speed (before buildSpeedMenu so active class is correct)
@@ -1168,9 +1183,6 @@ async function init() {
   }
 
   setVolumePercent(config.defaultVolume)
-  applyGlassOpacity(config.glassOpacity)
-  buildSpeedMenu()
-  updateJumpLabels()
   renderCoursePanel()
 
   video.playbackRate = currentSpeed
