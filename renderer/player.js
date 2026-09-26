@@ -49,7 +49,6 @@ let currentSpeed       = 1.0
 let currentFilePath        = ''
 let positionSaveInterval   = null   // replaces saveTimer; fires every 5s while playing
 let fsHideTimer            = null
-let stallTimer             = null   // A/V desync recovery watchdog
 let lastSeekTimestamp  = 0
 let currentFolderFiles = []
 let currentFolderIndex = -1
@@ -58,6 +57,22 @@ let audioContext         = null
 let mediaSourceNode      = null
 let gainNode             = null
 const configSync         = createConfigSync({ normalizeConfig, applyConfig: applySharedConfig })
+const mediaRecovery      = createMediaRecoveryController({
+  media: video,
+  onAction: handleRecoveryAction,
+})
+
+function handleRecoveryAction(action) {
+  const notice = getRecoveryNotice(action)
+  if (!notice) return
+  if (notice.kind === 'failed') hideLoading()
+  showToast(notice.message, {
+    persistent: notice.persistent,
+    copyText: notice.kind === 'failed'
+      ? `[media recovery] ${action.reason || 'unknown'}\nfile: ${currentFilePath}`
+      : null,
+  })
+}
 
 // ── Play/pause animation ───────────────────────────────────────
 const SVG_PLAY  = '<polygon points="5,3 19,12 5,21" fill="white"/>'
@@ -88,7 +103,10 @@ function togglePlay() {
 btnPlayPause.addEventListener('click', togglePlay)
 video.addEventListener('click', togglePlay)
 video.addEventListener('play',  updatePlayButton)
-video.addEventListener('pause', updatePlayButton)
+video.addEventListener('pause', () => {
+  updatePlayButton()
+  mediaRecovery.handlePause()
+})
 video.addEventListener('ended', updatePlayButton)
 
 // ── Loading indicator (debounced to avoid flicker on fast seeks) ──
@@ -101,86 +119,16 @@ function hideLoading()  {
   clearTimeout(loadingTimer)
   loadingOverlay.classList.add('hidden')
 }
-video.addEventListener('waiting',   showLoading)
+video.addEventListener('waiting',   () => { showLoading(); mediaRecovery.handleWaiting() })
 video.addEventListener('loadstart', showLoading)
-video.addEventListener('playing',   hideLoading)
+video.addEventListener('playing',   () => { hideLoading(); mediaRecovery.handlePlaying() })
 video.addEventListener('canplay',   hideLoading)
 video.addEventListener('seeked',    hideLoading)
 
-// ── Video error ────────────────────────────────────────────────
-let decodeRetryCount     = 0
-let decodeCanplayHandler = null  // single reference — prevents listener accumulation
-let decodeCanplayTimeout = null  // safety net if canplay never fires
-
-function cancelDecodeRetry() {
-  if (decodeCanplayHandler) {
-    video.removeEventListener('canplay', decodeCanplayHandler)
-    decodeCanplayHandler = null
-  }
-  clearTimeout(decodeCanplayTimeout)
-  decodeCanplayTimeout = null
-}
-
 video.addEventListener('error', () => {
   const err = video.error
-  const MSG = { 1: '載入中止', 2: '網路錯誤', 3: '解碼失敗', 4: '格式不支援' }
-  const detail = err ? (MSG[err.code] || `錯誤 ${err.code}`) : '未知錯誤'
-  const full   = err?.message ? `${detail} — ${err.message}` : detail
   console.error('[video error]', err, 'file:', currentFilePath)
-
-  if (err?.code === 3 && decodeRetryCount < 3 && video.src) {
-    const savedTime = video.currentTime
-    const wasPaused = video.paused
-    decodeRetryCount++
-
-    // Fix 1+2: remove any previous pending listener before adding a new one
-    cancelDecodeRetry()
-    // Fix 3: prevent stall-recovery from interfering during the reload cycle
-    clearTimeout(stallTimer)
-    stallTimer = null
-
-    // mute fallback also skips +0.5 s to avoid re-hitting the same bad packet
-    const shouldMute  = decodeRetryCount === 3
-    const seekTarget  = shouldMute ? savedTime + 0.5 : savedTime + decodeRetryCount
-    if (shouldMute) {
-      video.muted = true
-      showToast('音訊解碼失敗，已靜音繼續播放', { persistent: true })
-    } else {
-      showToast(decodeRetryCount === 1 ? '略過損壞音訊封包（+1 秒）' : '再次略過，跳至 +2 秒')
-    }
-
-    video.load()
-    // NOTE: video.load() resets both playbackRate → defaultPlaybackRate (1.0)
-    // and muted → defaultMuted (false); both are restored in the canplay handler.
-
-    // if canplay never arrives (completely broken file), give up after 8 s
-    decodeCanplayTimeout = setTimeout(() => {
-      cancelDecodeRetry()
-      hideLoading()
-      showToast('解碼失敗，無法繼續播放', { persistent: true })
-    }, 8000)
-
-    decodeCanplayHandler = () => {
-      cancelDecodeRetry()
-      video.playbackRate = currentSpeed   // restore: video.load() reset to defaultPlaybackRate
-      if (shouldMute) {
-        video.muted = true                // restore: video.load() reset to defaultMuted=false
-        volIcon.textContent = '🔇'
-      }
-      video.currentTime = seekTarget
-      if (!wasPaused) video.play().catch(() => {})
-    }
-    video.addEventListener('canplay', decodeCanplayHandler)
-    return
-  }
-
-  cancelDecodeRetry()
-  decodeRetryCount = 0
-  hideLoading()
-  showToast(`無法播放：${detail}`, {
-    persistent: true,
-    copyText: `[video error] code=${err?.code} ${full}\nfile: ${currentFilePath}`,
-  })
+  mediaRecovery.handleError(err)
 })
 
 // ── Progress bar ───────────────────────────────────────────────
@@ -198,6 +146,7 @@ function updateProgress() {
 video.addEventListener('timeupdate', () => {
   updateProgress()
   watchTick()
+  mediaRecovery.handleTimeUpdate()
 })
 
 // ── Position save (every 5 s while playing; immediate on pause/end) ──
@@ -219,24 +168,6 @@ video.addEventListener('play',  startPositionSave)
 video.addEventListener('pause', () => stopPositionSave(true))
 video.addEventListener('ended', () => stopPositionSave(false))
 window.addEventListener('beforeunload', savePosition)
-
-// ── A/V desync recovery: if stall lasts > 1 s on a local file, ──
-// seek back 0.5 s to force decoder resync (audio was running ahead)
-video.addEventListener('waiting', () => {
-  clearTimeout(stallTimer)
-  stallTimer = setTimeout(() => {
-    // Don't interfere if a decode-error retry is already in progress
-    if (decodeRetryCount > 0) return
-    // Guard: currentTime must be > 0 — prevents firing during initial load on a cold
-    // media pipeline (second instance, first open), which would seek back to 0 and
-    // loop forever (waiting → stall → seek(0) → waiting → …)
-    if (!video.paused && video.currentTime > 0 && video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
-      video.currentTime = Math.max(0, video.currentTime - 0.5)
-    }
-  }, 1000)
-})
-video.addEventListener('playing', () => clearTimeout(stallTimer))
-video.addEventListener('seeked',  () => clearTimeout(stallTimer))
 
 video.addEventListener('loadedmetadata', () => {
   timeDisplay.textContent = `00:00 / ${formatTime(video.duration)}`
@@ -426,8 +357,9 @@ volIcon.addEventListener('click', (e) => {
   if (document.body.classList.contains('vol-compact')) {
     volPopup.classList.toggle('hidden')
   } else {
-    video.muted = !video.muted
-    volIcon.textContent = video.muted ? '\uD83D\uDD07' : '\uD83D\uDD0A'
+    const muted = !video.muted
+    mediaRecovery.setUserMuted(muted)
+    volIcon.textContent = muted ? '\uD83D\uDD07' : '\uD83D\uDD0A'
   }
 })
 
@@ -588,10 +520,7 @@ function renderCoursePanel() {
   const data    = getCourseData()
   const courses = Object.values(data)
 
-  // Fix 4+5: cancel any pending decode retry and clear loading spinner
-  cancelDecodeRetry()
-  clearTimeout(stallTimer)
-  stallTimer = null
+  mediaRecovery.cancel()
   hideLoading()
   video.pause()
   video.removeAttribute('src')
@@ -676,17 +605,15 @@ function loadFile(filePath, forcePlay = false) {
     return
   }
   stopPositionSave(false)   // stop old interval; don't overwrite new file's pos
-  cancelDecodeRetry()       // Fix 4: discard any orphaned canplay handler from decode retry
-  clearTimeout(stallTimer)  // discard any stall-recovery timer left over from prev state
-  stallTimer = null
+  mediaRecovery.cancel()
   currentFilePath = filePath
-  decodeRetryCount = 0
-  video.muted = false
-  volIcon.textContent = '🔊'  // sync icon: decode-error mute may have left it as 🔇
+  mediaRecovery.setUserMuted(false)
+  volIcon.textContent = '🔊'
   watchReset()
   applyFolderVolume(filePath)
   document.getElementById('recent-overlay').classList.add('hidden')
   loadFolderContext(filePath)  // fire-and-forget, updates nav buttons
+  mediaRecovery.beginSource()
   video.src = 'file:///' + filePath.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/')
   video.playbackRate = currentSpeed
   filenameEl.innerHTML = formatPath(filePath)
@@ -883,26 +810,10 @@ document.addEventListener('keydown', (e) => {
 
 document.getElementById('btn-screenshot').addEventListener('click', startCrop)
 
-// ── A/V resync ─────────────────────────────────────────────────
-// Full decoder reload at the current position. Clears audio/video buffer
-// desync that occasional stalls can cause.
 function resyncVideo() {
   if (!currentFilePath || !video.duration) return
-  const savedTime = video.currentTime
-  const wasPaused = video.paused
-  const wasMuted  = video.muted
-  cancelDecodeRetry()
-  clearTimeout(stallTimer)
-  stallTimer = null
   stopPositionSave(false)
-  video.load()
-  video.addEventListener('canplay', () => {
-    video.playbackRate = currentSpeed
-    video.muted = wasMuted
-    video.currentTime = savedTime
-    if (!wasPaused) video.play().catch(() => {})
-    showToast('已重新同步')
-  }, { once: true })
+  mediaRecovery.resync()
 }
 
 document.getElementById('btn-resync').addEventListener('click', resyncVideo)

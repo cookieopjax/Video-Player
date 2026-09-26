@@ -13,6 +13,9 @@ const {
 // (STATUS_BREAKPOINT 0x80000003)，改用軟體解碼規避
 app.commandLine.appendSwitch('disable-accelerated-video-decode')
 app.commandLine.appendSwitch('disable-accelerated-video-encode')
+// Expose HTMLMediaElement.audioTracks so damaged audio can be removed from the
+// decoder pipeline while the video track keeps advancing.
+app.commandLine.appendSwitch('enable-blink-features', 'AudioVideoTracks')
 // Windows Media Foundation (WMF) 對部分 MP4 音訊封包格式過於嚴格，
 // 導致 PIPELINE_ERROR_DECODE。停用後 Chromium 改用內建 FFmpeg 音訊解碼，
 // 與 VLC/MPV 相同的解碼後端，相容性大幅提升。

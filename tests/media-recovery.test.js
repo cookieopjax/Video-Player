@@ -1,6 +1,7 @@
 const {
   createRecoveryPolicy,
   createMediaRecoveryController,
+  getRecoveryNotice,
 } = require('../renderer/media-recovery')
 
 describe('createRecoveryPolicy', () => {
@@ -87,6 +88,18 @@ describe('createRecoveryPolicy', () => {
       type: 'restart',
       targetTime: 26.25,
       audioEnabled: true,
+    })
+  })
+
+  test('a stall during video-only recovery never re-enables damaged audio', () => {
+    const policy = createRecoveryPolicy()
+    policy.decodeError(10)
+    policy.restartSucceeded(10.25, false)
+
+    expect(policy.stall(11)).toEqual({
+      type: 'restart',
+      targetTime: 11.25,
+      audioEnabled: false,
     })
   })
 })
@@ -250,5 +263,29 @@ describe('createMediaRecoveryController', () => {
     controller.setUserMuted(false)
     expect(media.muted).toBe(false)
     expect(media.audioTracks[0].enabled).toBe(true)
+  })
+})
+
+describe('getRecoveryNotice', () => {
+  test('marks video-only fallback as persistent but recovery checks as temporary', () => {
+    expect(getRecoveryNotice({ type: 'video-only' })).toMatchObject({
+      kind: 'video-only',
+      persistent: true,
+    })
+    expect(getRecoveryNotice({ type: 'probe-audio' })).toMatchObject({
+      kind: 'probing',
+      persistent: false,
+    })
+  })
+
+  test('distinguishes recovered audio from a terminal playback failure', () => {
+    expect(getRecoveryNotice({ type: 'audio-recovered' })).toMatchObject({
+      kind: 'recovered',
+      persistent: false,
+    })
+    expect(getRecoveryNotice({ type: 'failed', reason: 'restart-timeout' })).toMatchObject({
+      kind: 'failed',
+      persistent: true,
+    })
   })
 })

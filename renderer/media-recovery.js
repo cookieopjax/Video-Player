@@ -32,12 +32,13 @@ function createRecoveryPolicy() {
   }
 
   function stall(currentTime) {
+    const recoveringAudio = state.mode === 'video-only' || state.mode === 'probing-audio'
     const nearby = state.stallCount > 0
       && state.lastStallAt !== null
       && currentTime - state.lastStallAt < 5
     state.stallCount = nearby ? state.stallCount + 1 : 1
     state.lastStallAt = currentTime
-    return requestRestart(currentTime, !nearby)
+    return requestRestart(currentTime, !recoveringAudio && !nearby)
   }
 
   function progress(currentTime) {
@@ -296,7 +297,29 @@ function createMediaRecoveryController({
   }
 }
 
+function getRecoveryNotice(action) {
+  switch (action?.type) {
+    case 'restart':
+      return action.audioEnabled
+        ? { kind: 'restarting', message: '正在重新同步播放…', persistent: false }
+        : { kind: 'video-only', message: '偵測到破損音軌，已改為無聲繼續播放', persistent: true }
+    case 'video-only':
+      return { kind: 'video-only', message: '破損區段將以無聲播放，稍後自動恢復音訊', persistent: true }
+    case 'probe-audio':
+      return { kind: 'probing', message: '正在嘗試恢復音訊…', persistent: false }
+    case 'audio-recovered':
+      return { kind: 'recovered', message: '音訊已自動恢復', persistent: false }
+    case 'continue-video-only':
+      return { kind: 'video-only', message: '音訊仍損壞，繼續無聲播放並稍後重試', persistent: true }
+    case 'failed':
+      return { kind: 'failed', message: '影片解碼失敗，無法自動恢復', persistent: true }
+    default:
+      return null
+  }
+}
+
 if (typeof module !== 'undefined') module.exports = {
   createRecoveryPolicy,
   createMediaRecoveryController,
+  getRecoveryNotice,
 }
