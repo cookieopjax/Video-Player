@@ -2,13 +2,13 @@
 
 ## Process model
 
-Standard Electron two-process model:
+One Electron main process owns any number of independent player windows. Every renderer uses the same Chromium session/profile, so `localStorage` and packaged configuration remain consistent:
 
 ```
 ┌─────────────────────────────────┐
 │  Main process (main.js)         │
 │  Node.js — full OS access       │
-│  • BrowserWindow                │
+│  • BrowserWindow registry       │
 │  • ipcMain handlers             │
 │  • dialog, clipboard, fs        │
 │  • electron-updater             │
@@ -16,7 +16,7 @@ Standard Electron two-process model:
                 │ IPC (invoke/handle + send/on)
                 │ contextBridge
 ┌───────────────▼─────────────────┐
-│  Renderer process               │
+│  Renderer processes (1..n)      │
 │  Chromium — no Node access      │
 │  • index.html / style.css       │
 │  • utils.js + player.js         │
@@ -35,11 +35,11 @@ Standard Electron two-process model:
 | `electronAPI.getConfig()` | `get-config` | Reads and returns config (userData path when packaged, project root in dev) |
 | `electronAPI.getVersion()` | `get-version` | Returns `app.getVersion()` |
 | `electronAPI.openFile()` | `open-file` | `dialog.showOpenDialog`, returns path or null |
-| `electronAPI.saveConfig(cfg)` | `save-config` | `fs.writeFileSync` to config path |
+| `electronAPI.saveConfig(cfg)` | `save-config` | Writes process-global config, then broadcasts it to peer windows |
 | `electronAPI.copyImage(bytes)` | `copy-image` | `nativeImage.createFromBuffer` + `clipboard.writeImage` |
-| `electronAPI.winMinimize()` | `win-minimize` | `mainWin.minimize()` |
+| `electronAPI.winMinimize()` | `win-minimize` | Minimizes the sender's window |
 | `electronAPI.winMaximize()` | `win-maximize` | toggle maximize/unmaximize |
-| `electronAPI.winClose()` | `win-close` | `mainWin.close()` |
+| `electronAPI.winClose()` | `win-close` | Closes the sender's window |
 | `electronAPI.checkUpdate()` | `check-update` | `autoUpdater.checkForUpdates()` (no-op in dev) |
 | `electronAPI.downloadUpdate()` | `download-update` | `autoUpdater.downloadUpdate()` |
 | `electronAPI.installUpdate()` | `install-update` | `autoUpdater.quitAndInstall()` |
@@ -52,6 +52,7 @@ Standard Electron two-process model:
 |-------|-------------|---------|
 | `electronAPI.onUpdateStatus(cb)` | `update-status` | `{ state, version?, percent?, message?, latestVersion? }` |
 | `electronAPI.onFileArg(cb)` | `open-file-arg` | `filePath` string |
+| `electronAPI.onConfigUpdated(cb)` | `config-updated` | Normalized configuration saved by another window |
 
 ## Renderer layout (CSS)
 
@@ -86,9 +87,8 @@ isDraggingVolume    // horizontal volume track drag
 isDraggingVolVert   // vertical popup volume track drag
 currentSpeed        // current playback rate
 currentFilePath     // key for localStorage position memory
-saveTimer           // debounce handle for position writes
+positionSaveInterval // 5 s position-save interval while playing
 fsHideTimer         // fullscreen auto-hide timer
-isAutoResyncing     // true during AV-sync watchdog seek (suppresses loading indicator)
 lastSeekTimestamp   // ms of last jump/seek — togglePlay() ignores clicks within 400 ms
 currentFolderFiles  // sorted video list for current folder (from list-folder-videos IPC)
 currentFolderIndex  // index of currentFilePath in currentFolderFiles
@@ -101,16 +101,16 @@ progressCommitted   // true once commitCourseProgress fired for this file load
 Key responsibilities:
 - **Playback**: `togglePlay()`, play/pause/ended listeners → `updatePlayButton()`. Quick-seek guard: ignores play/pause clicks within 400 ms of `lastSeekTimestamp`.
 - **Progress**: `seekFromEvent()` uses `progressTrack.getBoundingClientRect()` for pixel-accurate seeks. `isDraggingProgress` blocks `timeupdate` updates during drag.
-- **Position memory**: `timeupdate` debounces a 4 s write to `localStorage['pos:' + path]`. `loadedmetadata` restores if saved > 0 and < duration − 2 s.
-- **AV-sync watchdog**: `scheduleAvResync()` sets a 60 s timer that force-seeks `video.currentTime = video.currentTime` to flush decoder drift. `isAutoResyncing` suppresses the loading overlay during this invisible seek.
+- **Position memory**: Saves every 5 s while playing and immediately on pause to `localStorage['pos:' + path]`. `loadedmetadata` restores if saved > 0 and < duration − 2 s.
+- **Damaged-audio recovery**: `media-recovery.js` owns all media reloads, recovery seeks, timers, and temporary listeners. It disables the real `audioTracks` entry after a decode error, continues video-only, probes audio after 6 s of media progress, confirms after 2 s, and backs off failed probes to 12/30 s.
 - **Volume**: Horizontal track drag + vertical popup drag (compact mode) + wheel ±5%, with a 0–200% range. Above 100%, a lazily-created Web Audio `GainNode` boosts the decoded audio. `saveFolderVolume()` persists per folder on mouseup/wheel. `applyFolderVolume()` restores on file load.
 - **Compact mode**: `volResizeObserver` on `#controls-right` toggles `vol-compact` body class (ON < 320 px, OFF > 390 px). `ctrlResizeObserver` on `#btn-row` toggles `ctrl-compact` (ON < 520 px, OFF > 570 px). Hysteresis prevents oscillation.
 - **Speed**: `buildSpeedMenu()` populates the dropdown from `config.speeds`. Dropdown toggled by speed button, closed on any `document.click`.
 - **Folder navigation**: `loadFolderContext()` fires on each `loadFile()` — calls `listFolderVideos` IPC, builds `currentFolderFiles`, enables/disables prev/next buttons. Prev/next buttons call `loadFile()` with adjacent path.
-- **Course progress**: After `PROGRESS_MIN_SECS` (300 s) of actual playback, `commitCourseProgress()` writes to `localStorage['courseData']`. Entry tracks `maxEpisodeIndex`, `maxEpisodeFile`, `totalFiles`, `playCount`, `lastAccessed`.
+- **Course progress**: After 60 s of actual playback and 15% position, `commitCourseProgress()` writes to `localStorage['courseData']`. Entry tracks `maxEpisodeIndex`, `maxEpisodeFile`, `totalFiles`, `playCount`, `lastAccessed`.
 - **Course panel**: `renderCoursePanel()` shown on home button click or when no video is loaded. Shows up to 6 course cards sorted by play count / last accessed.
 - **Screenshot**: `startCrop()` sets canvas size from `parentElement.clientWidth/Height` (not `getBoundingClientRect` which returns 0 on hidden elements). Drag selection draws dimmed overlay with transparent cutout. `finalizeCrop()` draws to offscreen canvas at native video resolution and sends PNG bytes via `copyImage` IPC.
-- **Settings**: Opens a modal, mirrors `config` into local state. Auto-saves 600 ms after any change via `scheduleAutoSave()`. Writes via `saveConfig` IPC and updates live state.
+- **Settings**: Opens a modal, mirrors `config` into local state. Auto-saves 600 ms after any change via `scheduleAutoSave()`. `config-sync.js` normalizes and deduplicates both local saves and `config-updated` broadcasts without overwriting live playback state.
 - **Auto-updater UI**: Listens to `onUpdateStatus` IPC events and updates the settings panel update section.
 
 ## utils.js — pure functions
@@ -156,9 +156,9 @@ Uses `electron-updater` pointed at GitHub Releases (`cookieopjax/Video-Player`).
 
 ## File association / multi-window
 
-No single-instance lock — multiple windows can open simultaneously (since v1.2.9).
+Electron runs as one primary instance with a `window-manager.js` registry. A secondary OS launch passes its video path through `requestSingleInstanceLock({ filePath })`, asks the primary process to create another `BrowserWindow`, and exits. Each window gets its own playback state, while all windows share the same session, `localStorage`, and config cache.
 
-On launch with a file argument (double-click or OS file association), `findFileArg(process.argv)` extracts the path. It's stored in `pendingFileArg` and sent to the renderer via `open-file-arg` IPC once `did-finish-load` fires.
+Window-specific IPC resolves the owner with `BrowserWindow.fromWebContents(event.sender)`. Update status and saved configuration use registry broadcasts.
 
 ## Icon generation
 
@@ -174,7 +174,7 @@ Run with `node scripts/gen-icon.js` to regenerate `assets/icon.png`.
 `electron-builder` targets Windows NSIS + portable (`npm run build → dist/`).
 
 ```json
-"files": ["main.js", "preload.js", "renderer/**/*"],
+"files": ["main.js", "main/**/*", "preload.js", "renderer/**/*"],
 "extraResources": [{ "from": "config.json", "to": "default-config.json" }]
 ```
 

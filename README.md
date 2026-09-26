@@ -14,6 +14,8 @@ A personal Electron-based video player for Windows, built with Apple-minimal gla
 - **Frameless window** — custom titlebar with minimize / maximize / close
 - **Fullscreen** — `F` key or the fullscreen button; controls auto-hide after 3 s of inactivity
 - **Glass overlay** — titlebar and controls float over the video with `backdrop-filter` blur
+- **Shared multi-window settings** — opening more videos creates independent windows that share one profile; setting changes appear in every window immediately
+- **Damaged-audio recovery** — keeps video moving silently through broken audio, probes again after 6 seconds, and restores sound automatically when decoding is healthy
 
 ### Keyboard shortcuts
 
@@ -43,7 +45,7 @@ Requires Node.js 18+ and npm.
 
 ## Configuration
 
-`config.json` at the project root is read on startup. Edit it directly or use the in-app settings panel (gear icon).
+In development, `config.json` at the project root is read on startup. Packaged builds keep it in Electron's shared `userData` directory. Edit it directly or use the in-app settings panel (gear icon).
 
 ```json
 {
@@ -59,13 +61,15 @@ Requires Node.js 18+ and npm.
 | `jumpSeconds` | `number` | Seconds to skip on arrow key / jump button |
 | `defaultVolume` | `number` | Initial volume 0–200; values above 100 apply audio gain |
 
-Changes made via the settings panel are written back to `config.json` and applied immediately.
+Changes made via the settings panel are written back to `config.json`, applied immediately, and broadcast to every open player window. Active playback time, speed, volume, and mute remain independent per window.
 
 ## Project structure
 
 ```
 video-player/
 ├── main.js           # Electron main process — BrowserWindow, IPC handlers
+├── main/
+│   └── window-manager.js # Shared process window registry + launch argument helpers
 ├── preload.js        # Context bridge — exposes safe IPC API to renderer
 ├── config.json       # User config (speeds, jumpSeconds, defaultVolume)
 ├── assets/
@@ -74,11 +78,12 @@ video-player/
 │   ├── index.html    # App shell + all DOM structure
 │   ├── style.css     # All styles — Apple minimal, CSS variables, glassmorphism
 │   ├── utils.js      # formatTime(), clamp() — dual export (browser + Jest)
+│   ├── config-sync.js # Normalized, deduplicated cross-window settings
+│   ├── media-recovery.js # Damaged-audio policy + single recovery controller
 │   └── player.js     # All renderer logic — playback, UI state, IPC calls
 ├── scripts/
 │   └── gen-icon.js   # Generates assets/icon.png via pngjs (run manually)
-└── tests/
-    └── utils.test.js # Jest tests for formatTime + clamp
+└── tests/            # Jest tests for utilities, windows, config sync, and recovery
 ```
 
 ## Architecture notes

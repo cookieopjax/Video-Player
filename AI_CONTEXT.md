@@ -22,6 +22,9 @@ A personal Electron video player (Windows) built from scratch. The owner's speci
 | Task | Files |
 |------|-------|
 | New IPC channel | `main.js` (add handler) + `preload.js` (expose) + `renderer/player.js` (call) |
+| Multi-window lifecycle | `main/window-manager.js` + `main.js` |
+| Settings synchronization | `renderer/config-sync.js` + `preload.js` + `main.js` |
+| Media stalls / decode failures | `renderer/media-recovery.js` policy/controller + `renderer/player.js` wiring |
 | New UI element | `renderer/index.html` + `renderer/style.css` + `renderer/player.js` |
 | Change visual style | `renderer/style.css` — CSS vars in `:root` are the main levers |
 | Change config schema | `config.json` + `main.js` DEFAULTS + `renderer/utils.js:normalizeConfig()` + settings panel HTML/JS |
@@ -78,9 +81,11 @@ Defined in `main.js` DEFAULTS and validated by `utils.js:normalizeConfig()`:
 
 **Config file path**: In dev, `config.json` at project root (`__dirname`). When packaged (`app.isPackaged`), it lives in `app.getPath('userData')`. The bundled `default-config.json` (via `extraResources`) is only read as a fallback for packaged builds with no user config.
 
+All player windows run under one primary Electron process and share this config plus one Chromium session. `save-config` broadcasts changes to peer windows immediately; current playback time, speed, volume, and mute remain window-local.
+
 ## State that lives in localStorage (renderer)
 
-- `pos:<filePath>` → playback position (seconds, float). Saved every 4 s via debounce, restored on `loadedmetadata`.
+- `pos:<filePath>` → playback position (seconds, float). Saved every 5 s while playing and on pause, restored on `loadedmetadata`.
 - `vol:<folderPath>` → per-folder volume (0–200 integer). Values above 100 use Web Audio gain. Saved on mouseup after drag or wheel.
 - `playbackSpeed` → last-used playback speed (float). Restored on init if it's in `config.speeds`.
 - `courseData` → JSON object keyed by folder path. Each entry: `{ folderName, maxEpisodeIndex, maxEpisodeFile, totalFiles, playCount, lastAccessed }`.
@@ -104,9 +109,9 @@ if (typeof module !== 'undefined') module.exports = { formatTime, clamp, ... }
 
 **Quick-seek debounce**: Jump buttons and arrow keys set `lastSeekTimestamp = Date.now()`. `togglePlay()` ignores clicks within 400 ms of a seek to prevent accidental play/pause when tapping jump buttons fast.
 
-**AV-sync watchdog**: While playing, a 60 s timer force-seeks to `video.currentTime` to flush decoder drift. `isAutoResyncing` flag suppresses the loading indicator during these invisible seeks.
+**Damaged-audio recovery**: `media-recovery.js` is the only owner of recovery reloads, seeks, timers, and listeners. Do not add a second error/stall retry path in `player.js`. Chromium is launched with the narrow `AudioVideoTracks` Blink feature so recovery can disable the actual audio track, continue video-only, probe after 6 s, and restore audio after 2 healthy seconds. Probe failures back off to 12 s then 30 s.
 
-**Course progress commit**: Triggered after `PROGRESS_MIN_SECS` (300 s) of actual playback. Uses `watchAccum` + `watchPlayStart` wall-clock tracking. `progressCommitted` flag prevents duplicate writes per file load.
+**Course progress commit**: Triggered after `PROGRESS_MIN_PLAY_SECS` (60 s) of actual playback and 15% position. Uses `watchAccum` + `watchPlayStart` wall-clock tracking. `progressCommitted` prevents duplicate writes per file load.
 
 **Folder navigation**: `loadFolderContext()` fires and forgets on every `loadFile()`, calling `list-folder-videos` IPC to get a sorted list of videos in the same folder. Prev/next buttons are enabled/disabled based on `currentFolderIndex`.
 
@@ -114,13 +119,15 @@ if (typeof module !== 'undefined') module.exports = { formatTime, clamp, ... }
 
 **Volume popup (compact mode)**: When `vol-compact` class is on body, the volume icon click toggles `#vol-popup` (vertical slider) instead of muting. `volPopup.addEventListener('click', e => e.stopPropagation())` prevents the document click handler from immediately closing the popup.
 
-## Current version: 1.3.0
+## Current version: 1.5.2
 
 ### Changelog
 - `1.0.0` — Initial: play/pause, progress, speed menu, keyboard, volume, file open/drop, custom titlebar, fullscreen, position memory, play/pause animation
 - `1.1.0` — Screenshot crop tool, settings panel, recent files, overlay layout (glass over video), progress/vol hit area fix, removed dblclick fullscreen, settings animation, new Apple-style icon
 - `1.2.x` — Auto-updater (electron-updater + GitHub Releases), file-association / double-click open, folder/episode navigation (prev/next), course progress panel (replaces recent files), per-folder volume, compact responsive layout (ResizeObserver), new config fields (autoPlay, resumeAfterCrop, autoCheckUpdate, hideDelay, glassOpacity), packaged config path moved to userData, multiple-window support (removed single-instance lock)
 - `1.3.0` — AV-sync watchdog (60 s force-seek), quick-seek debounce for play/pause, UI redesign
+- `1.5.1` — Volume range increased to 200% using Web Audio gain above 100%
+- `1.5.2` — Single-process multi-window shared settings; rewritten damaged-audio recovery with silent continuation and automatic sound restoration
 
 ## Suggested next features (not yet built)
 
