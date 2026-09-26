@@ -1,4 +1,8 @@
-const { findVideoFileArg, createWindowManager } = require('../main/window-manager')
+const {
+  findVideoFileArg,
+  resolveSecondInstanceFile,
+  createWindowManager,
+} = require('../main/window-manager')
 
 describe('findVideoFileArg', () => {
   test('returns the first supported video after executable and script arguments', () => {
@@ -23,6 +27,29 @@ describe('findVideoFileArg', () => {
   test('removes wrapping quotes from a video path', () => {
     expect(findVideoFileArg(['VideoPlayer.exe', '"D:\\My Videos\\lesson.webm"']))
       .toBe('D:\\My Videos\\lesson.webm')
+  })
+})
+
+describe('resolveSecondInstanceFile', () => {
+  test('prefers a supported file supplied through additional data', () => {
+    expect(resolveSecondInstanceFile(
+      { filePath: 'D:\\Videos\\preferred.mkv' },
+      ['VideoPlayer.exe', 'fallback.mp4'],
+    )).toBe('D:\\Videos\\preferred.mkv')
+  })
+
+  test('falls back to argv when additional data is absent or invalid', () => {
+    expect(resolveSecondInstanceFile({}, ['VideoPlayer.exe', 'fallback.mp4']))
+      .toBe('fallback.mp4')
+    expect(resolveSecondInstanceFile(
+      { filePath: 'D:\\Videos\\notes.txt' },
+      ['VideoPlayer.exe', 'fallback.webm'],
+    )).toBe('fallback.webm')
+  })
+
+  test('returns null when neither source contains a supported video', () => {
+    expect(resolveSecondInstanceFile({ filePath: '' }, ['VideoPlayer.exe', '--flag']))
+      .toBeNull()
   })
 })
 

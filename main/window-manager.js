@@ -20,6 +20,16 @@ function findVideoFileArg(argv) {
   return null
 }
 
+function isSupportedVideoPath(value) {
+  return typeof value === 'string' && findVideoFileArg(['app', value]) === stripWrappingQuotes(value)
+}
+
+function resolveSecondInstanceFile(additionalData, argv) {
+  const suppliedPath = additionalData?.filePath
+  if (isSupportedVideoPath(suppliedPath)) return stripWrappingQuotes(suppliedPath)
+  return findVideoFileArg(argv)
+}
+
 function createWindowManager({ BrowserWindow, createBrowserWindow }) {
   const windows = new Set()
 
@@ -51,4 +61,9 @@ function createWindowManager({ BrowserWindow, createBrowserWindow }) {
   }
 }
 
-module.exports = { VIDEO_EXTENSIONS, findVideoFileArg, createWindowManager }
+module.exports = {
+  VIDEO_EXTENSIONS,
+  findVideoFileArg,
+  resolveSecondInstanceFile,
+  createWindowManager,
+}

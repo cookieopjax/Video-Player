@@ -2,6 +2,12 @@ const { app, BrowserWindow, ipcMain, dialog, clipboard, nativeImage, shell } = r
 const path = require('path')
 const fs   = require('fs')
 const { autoUpdater } = require('electron-updater')
+const {
+  VIDEO_EXTENSIONS,
+  findVideoFileArg,
+  resolveSecondInstanceFile,
+  createWindowManager,
+} = require('./main/window-manager')
 
 // Chromium 的硬體加速影片解碼在某些 GPU/驅動組合下會直接 native crash
 // (STATUS_BREAKPOINT 0x80000003)，改用軟體解碼規避
@@ -12,15 +18,12 @@ app.commandLine.appendSwitch('disable-accelerated-video-encode')
 // 與 VLC/MPV 相同的解碼後端，相容性大幅提升。
 app.commandLine.appendSwitch('disable-features', 'MediaFoundationClearPlayback')
 
-// Allow multiple instances to coexist.
-// Each instance is a separate Chromium process; if they share the same userData
-// path, the second instance cannot acquire Chromium's profile lock and the
-// media pipeline silently fails — videos open but refuse to play.
-// Fix: non-primary instances get a PID-scoped userData directory so there is
-// no lock contention.  Must run before app.whenReady().
-if (!app.requestSingleInstanceLock()) {
-  app.setPath('userData', app.getPath('userData') + '-' + process.pid)
-}
+// Keep one Electron process so every player window shares the same profile,
+// localStorage and configuration. A secondary launch asks the primary process
+// to create another independent player window, then exits.
+const initialFilePath = findVideoFileArg(process.argv)
+const hasSingleInstanceLock = app.requestSingleInstanceLock({ filePath: initialFilePath })
+if (!hasSingleInstanceLock) app.quit()
 
 const DEFAULTS = {
   speeds: [0.75, 1.0, 1.25, 1.5, 2.0],
@@ -60,7 +63,7 @@ autoUpdater.logger               = null
 autoUpdater.requestHeaders       = { 'Cache-Control': 'no-cache' }
 
 function sendUpdateStatus(status) {
-  mainWin?.webContents.send('update-status', status)
+  windowManager.broadcast('update-status', status)
 }
 
 autoUpdater.on('checking-for-update',  ()     => sendUpdateStatus({ state: 'checking' }))
@@ -70,25 +73,9 @@ autoUpdater.on('download-progress',    (p)    => sendUpdateStatus({ state: 'down
 autoUpdater.on('update-downloaded',    ()     => sendUpdateStatus({ state: 'downloaded' }))
 autoUpdater.on('error',                (err)  => sendUpdateStatus({ state: 'error', message: err.message }))
 
-// ── File arg helpers ───────────────────────────────────────────
-const VIDEO_EXTS = new Set(['mp4', 'webm', 'mov', 'avi', 'mkv', 'm4v', 'flv', 'wmv'])
-
-function findFileArg(argv) {
-  // argv[0] is the executable; skip flags (--xxx)
-  for (const arg of argv.slice(1)) {
-    if (arg.startsWith('-')) continue
-    const ext = arg.split('.').pop().toLowerCase()
-    if (VIDEO_EXTS.has(ext)) return arg
-  }
-  return null
-}
-
 // ── Window ─────────────────────────────────────────────────────
-let mainWin = null
-let pendingFileArg = null
-
-function createWindow() {
-  mainWin = new BrowserWindow({
+function createBrowserWindow(filePath) {
+  const win = new BrowserWindow({
     width: 900, height: 600, minWidth: 640, minHeight: 400,
     backgroundColor: '#0f0c29', frame: false,
     icon: app.isPackaged ? undefined : path.join(__dirname, 'assets', 'icon.png'),
@@ -97,45 +84,57 @@ function createWindow() {
       nodeIntegration: false, contextIsolation: true,
     },
   })
-  mainWin.loadFile('renderer/index.html')
-  // Send pending file arg once the renderer is ready
-  mainWin.webContents.once('did-finish-load', () => {
-    if (pendingFileArg) {
-      mainWin.webContents.send('open-file-arg', pendingFileArg)
-      pendingFileArg = null
+  win.loadFile('renderer/index.html')
+  win.webContents.once('did-finish-load', () => {
+    if (filePath) win.webContents.send('open-file-arg', filePath)
+  })
+  return win
+}
+
+const windowManager = createWindowManager({ BrowserWindow, createBrowserWindow })
+
+if (hasSingleInstanceLock) {
+  app.on('second-instance', (event, argv, workingDirectory, additionalData) => {
+    windowManager.createWindow(resolveSecondInstanceFile(additionalData, argv))
+  })
+
+  app.whenReady().then(() => {
+    windowManager.createWindow(initialFilePath)
+  // Auto-check for updates after window is ready (3s delay)
+    if (app.isPackaged) {
+      setTimeout(() => {
+        try {
+          if (readConfig().autoCheckUpdate !== false) autoUpdater.checkForUpdates()
+        } catch { /* ignore */ }
+      }, 3000)
     }
   })
 }
-
-app.whenReady().then(() => {
-  pendingFileArg = findFileArg(process.argv)
-  createWindow()
-  // Auto-check for updates after window is ready (3s delay)
-  if (app.isPackaged) {
-    setTimeout(() => {
-      try {
-        if (readConfig().autoCheckUpdate !== false) autoUpdater.checkForUpdates()
-      } catch { /* ignore */ }
-    }, 3000)
-  }
-})
 app.on('window-all-closed', () => app.quit())
 
 // ── IPC handlers ───────────────────────────────────────────────
 ipcMain.handle('get-config',  () => readConfig())
 ipcMain.handle('get-version', () => app.getVersion())
 
-ipcMain.handle('open-file', async () => {
-  const { canceled, filePaths } = await dialog.showOpenDialog({
+ipcMain.handle('open-file', async (event) => {
+  const owner = windowManager.getWindowForEvent(event)
+  const options = {
     properties: ['openFile'],
-    filters: [{ name: 'Videos', extensions: ['mp4', 'webm', 'mov', 'avi', 'mkv', 'm4v', 'flv', 'wmv'] }],
-  })
+    filters: [{ name: 'Videos', extensions: [...VIDEO_EXTENSIONS] }],
+  }
+  const { canceled, filePaths } = owner
+    ? await dialog.showOpenDialog(owner, options)
+    : await dialog.showOpenDialog(options)
   return canceled ? null : filePaths[0]
 })
 
-ipcMain.handle('win-minimize', () => mainWin?.minimize())
-ipcMain.handle('win-maximize', () => { mainWin?.isMaximized() ? mainWin.unmaximize() : mainWin?.maximize() })
-ipcMain.handle('win-close',    () => mainWin?.close())
+ipcMain.handle('win-minimize', event => windowManager.getWindowForEvent(event)?.minimize())
+ipcMain.handle('win-maximize', event => {
+  const win = windowManager.getWindowForEvent(event)
+  if (!win) return
+  win.isMaximized() ? win.unmaximize() : win.maximize()
+})
+ipcMain.handle('win-close', event => windowManager.getWindowForEvent(event)?.close())
 
 ipcMain.handle('copy-text', (event, text) => {
   clipboard.writeText(String(text))
