@@ -103,7 +103,7 @@ Key responsibilities:
 - **Progress**: `seekFromEvent()` uses `progressTrack.getBoundingClientRect()` for pixel-accurate seeks. `isDraggingProgress` blocks `timeupdate` updates during drag.
 - **Position memory**: `timeupdate` debounces a 4 s write to `localStorage['pos:' + path]`. `loadedmetadata` restores if saved > 0 and < duration − 2 s.
 - **AV-sync watchdog**: `scheduleAvResync()` sets a 60 s timer that force-seeks `video.currentTime = video.currentTime` to flush decoder drift. `isAutoResyncing` suppresses the loading overlay during this invisible seek.
-- **Volume**: Horizontal track drag + vertical popup drag (compact mode) + wheel ±5%. `saveFolderVolume()` persists per folder on mouseup/wheel. `applyFolderVolume()` restores on file load.
+- **Volume**: Horizontal track drag + vertical popup drag (compact mode) + wheel ±5%, with a 0–200% range. Above 100%, a lazily-created Web Audio `GainNode` boosts the decoded audio. `saveFolderVolume()` persists per folder on mouseup/wheel. `applyFolderVolume()` restores on file load.
 - **Compact mode**: `volResizeObserver` on `#controls-right` toggles `vol-compact` body class (ON < 320 px, OFF > 390 px). `ctrlResizeObserver` on `#btn-row` toggles `ctrl-compact` (ON < 520 px, OFF > 570 px). Hysteresis prevents oscillation.
 - **Speed**: `buildSpeedMenu()` populates the dropdown from `config.speeds`. Dropdown toggled by speed button, closed on any `document.click`.
 - **Folder navigation**: `loadFolderContext()` fires on each `loadFile()` — calls `listFolderVideos` IPC, builds `currentFolderFiles`, enables/disables prev/next buttons. Prev/next buttons call `loadFile()` with adjacent path.

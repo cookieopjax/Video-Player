@@ -1,7 +1,7 @@
 const {
   formatTime, clamp, normalizeConfig,
   normalizePath, getFolderPath, getFolderName, escapeHtml, getAdjacentEpisode,
-  buildCourseEntry,
+  buildCourseEntry, getVolumeState,
 } = require('../renderer/utils')
 
 // ── formatTime ─────────────────────────────────────────────────
@@ -92,8 +92,9 @@ describe('normalizeConfig', () => {
     expect(cfg.speeds).toEqual([0.75, 1, 1.25, 1.5, 2])
   })
 
-  test('clamps defaultVolume to 0-100', () => {
-    expect(normalizeConfig({ defaultVolume: 150 }).defaultVolume).toBe(100)
+  test('clamps defaultVolume to 0-200', () => {
+    expect(normalizeConfig({ defaultVolume: 150 }).defaultVolume).toBe(150)
+    expect(normalizeConfig({ defaultVolume: 250 }).defaultVolume).toBe(200)
     expect(normalizeConfig({ defaultVolume: -20 }).defaultVolume).toBe(0)
   })
 
@@ -177,6 +178,25 @@ describe('normalizeConfig', () => {
 
   test('glassOpacity ignores non-numeric value', () => {
     expect(normalizeConfig({ glassOpacity: 'dark' }).glassOpacity).toBe(42)
+  })
+})
+
+// ── getVolumeState ─────────────────────────────────────────────
+describe('getVolumeState', () => {
+  test('uses native media volume without gain up to 100%', () => {
+    expect(getVolumeState(40)).toEqual({ percent: 40, mediaVolume: 0.4, gain: 1 })
+    expect(getVolumeState(100)).toEqual({ percent: 100, mediaVolume: 1, gain: 1 })
+  })
+
+  test('keeps native media volume at maximum and applies gain above 100%', () => {
+    expect(getVolumeState(150)).toEqual({ percent: 150, mediaVolume: 1, gain: 1.5 })
+    expect(getVolumeState(200)).toEqual({ percent: 200, mediaVolume: 1, gain: 2 })
+  })
+
+  test('rounds and clamps the requested percentage to 0-200%', () => {
+    expect(getVolumeState(-10)).toEqual({ percent: 0, mediaVolume: 0, gain: 1 })
+    expect(getVolumeState(250)).toEqual({ percent: 200, mediaVolume: 1, gain: 2 })
+    expect(getVolumeState(125.6)).toEqual({ percent: 126, mediaVolume: 1, gain: 1.26 })
   })
 })
 

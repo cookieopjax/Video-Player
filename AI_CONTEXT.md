@@ -81,7 +81,7 @@ Defined in `main.js` DEFAULTS and validated by `utils.js:normalizeConfig()`:
 ## State that lives in localStorage (renderer)
 
 - `pos:<filePath>` → playback position (seconds, float). Saved every 4 s via debounce, restored on `loadedmetadata`.
-- `vol:<folderPath>` → per-folder volume (0–100 integer). Saved on mouseup after drag or wheel.
+- `vol:<folderPath>` → per-folder volume (0–200 integer). Values above 100 use Web Audio gain. Saved on mouseup after drag or wheel.
 - `playbackSpeed` → last-used playback speed (float). Restored on init if it's in `config.speeds`.
 - `courseData` → JSON object keyed by folder path. Each entry: `{ folderName, maxEpisodeIndex, maxEpisodeFile, totalFiles, playCount, lastAccessed }`.
 

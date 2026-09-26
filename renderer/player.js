@@ -53,6 +53,10 @@ let stallTimer             = null   // A/V desync recovery watchdog
 let lastSeekTimestamp  = 0
 let currentFolderFiles = []
 let currentFolderIndex = -1
+let currentVolumePercent = 70
+let audioContext         = null
+let mediaSourceNode      = null
+let gainNode             = null
 
 // ── Play/pause animation ───────────────────────────────────────
 const SVG_PLAY  = '<polygon points="5,3 19,12 5,21" fill="white"/>'
@@ -332,22 +336,59 @@ document.addEventListener('keydown', (e) => {
 })
 
 // ── Volume control ─────────────────────────────────────────────
-function setVolume(v) {
-  const vol = clamp(v, 0, 1)
-  video.volume = vol
-  const pct = Math.round(vol * 100)
-  volFill.style.width       = pct + '%'
-  volThumb.style.left       = pct + '%'
-  volLabel.textContent      = pct + '%'
+function ensureAudioGraph() {
+  if (gainNode) return gainNode
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext
+  if (!AudioContextClass) return null
+
+  try {
+    audioContext    = new AudioContextClass()
+    mediaSourceNode = audioContext.createMediaElementSource(video)
+    gainNode        = audioContext.createGain()
+    mediaSourceNode.connect(gainNode)
+    gainNode.connect(audioContext.destination)
+    return gainNode
+  } catch (err) {
+    console.error('[audio gain] unable to create audio graph', err)
+    audioContext = null
+    mediaSourceNode = null
+    gainNode = null
+    return null
+  }
+}
+
+function resumeAudioContext() {
+  if (audioContext?.state === 'suspended') {
+    audioContext.resume().catch(err => console.error('[audio gain] resume failed', err))
+  }
+}
+
+function setVolumePercent(requestedPercent) {
+  const state = getVolumeState(requestedPercent)
+  currentVolumePercent = state.percent
+  video.volume = state.mediaVolume
+
+  if (state.gain > 1 || gainNode) {
+    const audioGain = ensureAudioGraph()
+    if (audioGain) {
+      audioGain.gain.value = state.gain
+      resumeAudioContext()
+    }
+  }
+
+  const trackPct = state.percent / 2
+  volFill.style.width       = trackPct + '%'
+  volThumb.style.left       = trackPct + '%'
+  volLabel.textContent      = state.percent + '%'
   // Vertical popup track
-  volFillVert.style.height  = pct + '%'
-  volThumbVert.style.bottom = `calc(${pct}% - 5.5px)`
-  volPopupLabel.textContent = pct + '%'
+  volFillVert.style.height  = trackPct + '%'
+  volThumbVert.style.bottom = `calc(${trackPct}% - 5.5px)`
+  volPopupLabel.textContent = state.percent + '%'
 }
 
 function volumeFromEvent(e) {
   const rect = volTrack.getBoundingClientRect()
-  setVolume((e.clientX - rect.left) / rect.width)
+  setVolumePercent(((e.clientX - rect.left) / rect.width) * 200)
 }
 
 volTrack.addEventListener('mousedown', (e) => { isDraggingVolume = true; volumeFromEvent(e) })
@@ -365,16 +406,19 @@ document.addEventListener('mouseup', () => {
 // Vertical track (compact popup)
 function volumeFromVertEvent(e) {
   const rect = volTrackVert.getBoundingClientRect()
-  setVolume(1 - clamp((e.clientY - rect.top) / rect.height, 0, 1))
+  setVolumePercent((1 - clamp((e.clientY - rect.top) / rect.height, 0, 1)) * 200)
 }
 volTrackVert.addEventListener('mousedown', (e) => { e.stopPropagation(); isDraggingVolVert = true; volumeFromVertEvent(e) })
 volPopup.addEventListener('click', (e) => e.stopPropagation())
 
 volumeWrap.addEventListener('wheel', (e) => {
   e.preventDefault()
-  setVolume(video.volume + (e.deltaY < 0 ? 0.05 : -0.05))
+  setVolumePercent(currentVolumePercent + (e.deltaY < 0 ? 5 : -5))
   saveFolderVolume()
 }, { passive: false })
+
+video.addEventListener('play', resumeAudioContext)
+document.addEventListener('pointerdown', resumeAudioContext)
 
 volIcon.addEventListener('click', (e) => {
   e.stopPropagation()
@@ -615,14 +659,14 @@ function isSupportedVideo(filePath) {
 function saveFolderVolume() {
   const folderPath = getFolderPath(currentFilePath)
   if (!folderPath) return
-  localStorage.setItem('vol:' + folderPath, Math.round(video.volume * 100))
+  localStorage.setItem('vol:' + folderPath, currentVolumePercent)
 }
 
 function applyFolderVolume(filePath) {
   const folderPath = getFolderPath(filePath)
   if (!folderPath) return
   const saved = parseFloat(localStorage.getItem('vol:' + folderPath))
-  if (!isNaN(saved)) setVolume(saved / 100)
+  if (!isNaN(saved)) setVolumePercent(saved)
 }
 
 function loadFile(filePath, forcePlay = false) {
@@ -1123,7 +1167,7 @@ async function init() {
     currentSpeed = savedSpeed
   }
 
-  setVolume(config.defaultVolume / 100)
+  setVolumePercent(config.defaultVolume)
   applyGlassOpacity(config.glassOpacity)
   buildSpeedMenu()
   updateJumpLabels()

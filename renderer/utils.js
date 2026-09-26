@@ -12,6 +12,15 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max)
 }
 
+function getVolumeState(requestedPercent) {
+  const percent = clamp(Math.round(requestedPercent), 0, 200)
+  return {
+    percent,
+    mediaVolume: Math.min(percent / 100, 1),
+    gain: percent > 100 ? percent / 100 : 1,
+  }
+}
+
 // Sanitise a raw config object — guarantees all required keys exist with valid values.
 function normalizeConfig(raw) {
   const DEFAULT_SPEEDS = [0.75, 1, 1.25, 1.5, 2]
@@ -23,7 +32,7 @@ function normalizeConfig(raw) {
     jumpSeconds:    (typeof raw?.jumpSeconds === 'number' && raw.jumpSeconds >= 1 && isFinite(raw.jumpSeconds))
                       ? Math.floor(raw.jumpSeconds) : 15,
     defaultVolume:  (typeof raw?.defaultVolume === 'number' && isFinite(raw.defaultVolume))
-                      ? clamp(Math.round(raw.defaultVolume), 0, 100) : 70,
+                      ? clamp(Math.round(raw.defaultVolume), 0, 200) : 70,
     autoPlay:        raw?.autoPlay === true,
     resumeAfterCrop: raw?.resumeAfterCrop === true,
     autoCheckUpdate: raw?.autoCheckUpdate !== false,
@@ -87,7 +96,7 @@ function buildCourseEntry(existing, files, currentIndex, filePath, folderPath) {
 
 // Browser: globals. Node (Jest): module.exports
 if (typeof module !== 'undefined') module.exports = {
-  formatTime, clamp, normalizeConfig,
+  formatTime, clamp, getVolumeState, normalizeConfig,
   normalizePath, getFolderPath, getFolderName, escapeHtml, getAdjacentEpisode,
   buildCourseEntry,
 }

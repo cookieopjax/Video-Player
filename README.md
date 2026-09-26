@@ -57,7 +57,7 @@ Requires Node.js 18+ and npm.
 |-------|------|-------------|
 | `speeds` | `number[]` | Speed options shown in the speed menu |
 | `jumpSeconds` | `number` | Seconds to skip on arrow key / jump button |
-| `defaultVolume` | `number` | Initial volume 0–100 |
+| `defaultVolume` | `number` | Initial volume 0–200; values above 100 apply audio gain |
 
 Changes made via the settings panel are written back to `config.json` and applied immediately.
 
