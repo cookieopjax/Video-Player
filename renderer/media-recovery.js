@@ -204,6 +204,7 @@ function createMediaRecoveryController({
 
   function handleError(error = media.error) {
     if (!active || terminal) return
+    if (restart) return
     if (error?.code !== 3) {
       fail('media-error')
       return
@@ -237,6 +238,17 @@ function createMediaRecoveryController({
       waitingTimer = null
       if (token !== session || !active || terminal) return
       if (media.paused || media.currentTime <= 0 || media.readyState >= 3) return
+      if (policy.snapshot().mode === 'probing-audio') {
+        setAudioEnabled(false)
+        const fallback = policy.restartFailed(media.currentTime)
+        onAction(fallback)
+        performRestart({
+          type: 'restart',
+          targetTime: media.currentTime + 0.25,
+          audioEnabled: false,
+        })
+        return
+      }
       performRestart(policy.stall(media.currentTime))
     }, 1000)
   }

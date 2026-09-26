@@ -264,6 +264,26 @@ describe('createMediaRecoveryController', () => {
     expect(media.muted).toBe(false)
     expect(media.audioTracks[0].enabled).toBe(true)
   })
+
+  test('a stall during an audio probe disables audio and increases the retry delay', () => {
+    const media = createFakeMedia()
+    const timers = createFakeTimers()
+    const actions = []
+    const controller = createMediaRecoveryController({ media, timers, onAction: action => actions.push(action) })
+    controller.beginSource()
+    controller.handleError({ code: 3 })
+    media.emit('canplay')
+    media.currentTime = 16.25
+    controller.handleTimeUpdate()
+    expect(media.audioTracks[0].enabled).toBe(true)
+
+    media.currentTime = 16.5
+    controller.handleWaiting()
+    timers.runDelay(1000)
+
+    expect(media.audioTracks[0].enabled).toBe(false)
+    expect(actions).toContainEqual({ type: 'continue-video-only', retryDelay: 12 })
+  })
 })
 
 describe('getRecoveryNotice', () => {
