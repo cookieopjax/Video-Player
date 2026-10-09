@@ -21,6 +21,12 @@ function getVolumeState(requestedPercent) {
   }
 }
 
+function getVolumeIconState(muted) {
+  return muted
+    ? { state: 'muted', label: '取消靜音' }
+    : { state: 'audible', label: '靜音' }
+}
+
 // Sanitise a raw config object — guarantees all required keys exist with valid values.
 function normalizeConfig(raw) {
   const DEFAULT_SPEEDS = [0.75, 1, 1.25, 1.5, 2]
@@ -96,7 +102,7 @@ function buildCourseEntry(existing, files, currentIndex, filePath, folderPath) {
 
 // Browser: globals. Node (Jest): module.exports
 if (typeof module !== 'undefined') module.exports = {
-  formatTime, clamp, getVolumeState, normalizeConfig,
+  formatTime, clamp, getVolumeState, getVolumeIconState, normalizeConfig,
   normalizePath, getFolderPath, getFolderName, escapeHtml, getAdjacentEpisode,
   buildCourseEntry,
 }

@@ -102,11 +102,11 @@
 
       <div id="controls-center">
         <button id="btn-prev" class="btn btn-icon" title="上一部" disabled>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 5v14"/><path d="m18 6-8 6 8 6V6Z"/></svg>
         </button>
 
         <button id="btn-backward" class="btn btn-jump" title="後退 (←)">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 18-8-6 8-6v12Z"/><path d="m21 18-8-6 8-6v12Z"/></svg>
           <span id="label-backward">10s</span>
         </button>
 
@@ -116,18 +116,21 @@
         </button>
 
         <button id="btn-forward" class="btn btn-jump" title="前進 (→)">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.5"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 6 8 6-8 6V6Z"/><path d="m13 6 8 6-8 6V6Z"/></svg>
           <span id="label-forward">10s</span>
         </button>
 
         <button id="btn-next" class="btn btn-icon" title="下一部" disabled>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 5v14"/><path d="m6 6 8 6-8 6V6Z"/></svg>
         </button>
       </div>
 
       <div id="controls-right">
         <div id="volume-wrap">
-          <span id="vol-icon">&#128266;</span>
+          <button id="vol-icon" type="button" data-state="audible" title="靜音" aria-label="靜音">
+            <svg class="volume-icon volume-icon-audible" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>
+            <svg class="volume-icon volume-icon-muted" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="m16 9 6 6"/><path d="m22 9-6 6"/></svg>
+          </button>
           <div id="vol-track">
             <div id="vol-fill"></div>
             <div id="vol-thumb"></div>

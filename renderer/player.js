@@ -318,6 +318,13 @@ function setVolumePercent(requestedPercent) {
   volPopupLabel.textContent = state.percent + '%'
 }
 
+function updateVolumeIcon(muted) {
+  const iconState = getVolumeIconState(muted)
+  volIcon.dataset.state = iconState.state
+  volIcon.title = iconState.label
+  volIcon.setAttribute('aria-label', iconState.label)
+}
+
 function volumeFromEvent(e) {
   const rect = volTrack.getBoundingClientRect()
   setVolumePercent(((e.clientX - rect.left) / rect.width) * 200)
@@ -359,7 +366,7 @@ volIcon.addEventListener('click', (e) => {
   } else {
     const muted = !video.muted
     mediaRecovery.setUserMuted(muted)
-    volIcon.textContent = muted ? '\uD83D\uDD07' : '\uD83D\uDD0A'
+    updateVolumeIcon(muted)
   }
 })
 
@@ -608,7 +615,7 @@ function loadFile(filePath, forcePlay = false) {
   mediaRecovery.cancel()
   currentFilePath = filePath
   mediaRecovery.setUserMuted(false)
-  volIcon.textContent = '🔊'
+  updateVolumeIcon(false)
   watchReset()
   applyFolderVolume(filePath)
   document.getElementById('recent-overlay').classList.add('hidden')

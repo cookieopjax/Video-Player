@@ -2,6 +2,7 @@ const {
   formatTime, clamp, normalizeConfig,
   normalizePath, getFolderPath, getFolderName, escapeHtml, getAdjacentEpisode,
   buildCourseEntry, getVolumeState,
+  getVolumeIconState,
 } = require('../renderer/utils')
 
 // ── formatTime ─────────────────────────────────────────────────
@@ -197,6 +198,22 @@ describe('getVolumeState', () => {
     expect(getVolumeState(-10)).toEqual({ percent: 0, mediaVolume: 0, gain: 1 })
     expect(getVolumeState(250)).toEqual({ percent: 200, mediaVolume: 1, gain: 2 })
     expect(getVolumeState(125.6)).toEqual({ percent: 126, mediaVolume: 1, gain: 1.26 })
+  })
+})
+
+describe('getVolumeIconState', () => {
+  test('shows the audible icon and offers mute while sound is on', () => {
+    expect(getVolumeIconState(false)).toEqual({
+      state: 'audible',
+      label: '靜音',
+    })
+  })
+
+  test('shows the muted icon and offers unmute while sound is off', () => {
+    expect(getVolumeIconState(true)).toEqual({
+      state: 'muted',
+      label: '取消靜音',
+    })
   })
 })
 
