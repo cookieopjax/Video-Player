@@ -112,7 +112,10 @@ function createRecoveryPolicy() {
 
 function createMediaRecoveryController({
   media,
-  timers = { setTimeout, clearTimeout },
+  timers = {
+    setTimeout: (...args) => globalThis.setTimeout(...args),
+    clearTimeout: (...args) => globalThis.clearTimeout(...args),
+  },
   onAction = () => {},
 }) {
   const policy = createRecoveryPolicy()

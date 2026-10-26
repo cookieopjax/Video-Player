@@ -317,6 +317,40 @@ describe('createMediaRecoveryController', () => {
     expect(actions.at(-1)).toMatchObject({ type: 'restart', audioEnabled: true })
   })
 
+  test('default browser timers preserve the required global receiver', () => {
+    const originalSetTimeout = global.setTimeout
+    const originalClearTimeout = global.clearTimeout
+    const clearedIds = []
+    global.setTimeout = function (_callback, _delay) {
+      if (this !== globalThis) throw new TypeError('Illegal invocation')
+      return 71
+    }
+    global.clearTimeout = function (id) {
+      if (this !== globalThis) throw new TypeError('Illegal invocation')
+      clearedIds.push(id)
+    }
+
+    try {
+      const media = createFakeMedia()
+      const actions = []
+      const controller = createMediaRecoveryController({
+        media,
+        onAction: action => actions.push(action),
+      })
+      controller.beginSource()
+
+      expect(() => controller.resync()).not.toThrow()
+      expect(media.loadCount).toBe(1)
+      expect(actions.at(-1)).toMatchObject({ type: 'restart', audioEnabled: true })
+
+      controller.cancel()
+      expect(clearedIds).toContain(71)
+    } finally {
+      global.setTimeout = originalSetTimeout
+      global.clearTimeout = originalClearTimeout
+    }
+  })
+
   test('manual resync without an active video reports why nothing can be restarted', () => {
     const media = createFakeMedia()
     const actions = []
