@@ -1,4 +1,5 @@
 const RECOVERY_DELAYS = [6, 12, 30]
+const RECOVERY_SKIP_SECONDS = [1, 2, 3]
 
 function createRecoveryPolicy() {
   let state
@@ -11,6 +12,7 @@ function createRecoveryPolicy() {
       probeStartedAt: null,
       lastStallAt: null,
       stallCount: 0,
+      skipIndex: 0,
     }
   }
 
@@ -18,17 +20,26 @@ function createRecoveryPolicy() {
     return RECOVERY_DELAYS[Math.min(state.retryIndex, RECOVERY_DELAYS.length - 1)]
   }
 
-  function requestRestart(currentTime, audioEnabled) {
+  function requestRestart(currentTime, audioEnabled, skipSeconds = 0.25) {
     state.mode = 'restarting'
-    return {
+    const safeCurrentTime = Number.isFinite(currentTime) && currentTime >= 0 ? currentTime : 0
+    const action = {
       type: 'restart',
-      targetTime: currentTime + 0.25,
+      targetTime: safeCurrentTime + skipSeconds,
       audioEnabled,
     }
+    if (skipSeconds !== 0.25) action.skipSeconds = skipSeconds
+    return action
   }
 
   function decodeError(currentTime) {
-    return requestRestart(currentTime, false)
+    const skipSeconds = RECOVERY_SKIP_SECONDS[Math.min(state.skipIndex, RECOVERY_SKIP_SECONDS.length - 1)]
+    state.skipIndex = Math.min(state.skipIndex + 1, RECOVERY_SKIP_SECONDS.length - 1)
+    return requestRestart(currentTime, false, skipSeconds)
+  }
+
+  function manualRestart(currentTime) {
+    return requestRestart(currentTime, true, 0)
   }
 
   function stall(currentTime) {
@@ -56,6 +67,7 @@ function createRecoveryPolicy() {
     if (state.mode === 'probing-audio' && currentTime - state.probeStartedAt >= 2) {
       state.mode = 'normal'
       state.retryIndex = 0
+      state.skipIndex = 0
       state.nextProbeAt = null
       state.probeStartedAt = null
       return { type: 'audio-recovered' }
@@ -67,6 +79,7 @@ function createRecoveryPolicy() {
   function restartSucceeded(currentTime, audioEnabled) {
     if (audioEnabled) {
       state.mode = 'normal'
+      state.skipIndex = 0
       return null
     }
 
@@ -94,7 +107,7 @@ function createRecoveryPolicy() {
   }
 
   reset()
-  return { reset, decodeError, stall, progress, restartSucceeded, restartFailed, snapshot }
+  return { reset, decodeError, manualRestart, stall, progress, restartSucceeded, restartFailed, snapshot }
 }
 
 function createMediaRecoveryController({
@@ -107,15 +120,24 @@ function createMediaRecoveryController({
   let active = false
   let terminal = false
   let userMuted = false
+  let recoveryMuted = false
   let waitingTimer = null
   let restart = null
+
+  function applyMuteState() {
+    media.muted = userMuted || recoveryMuted
+  }
 
   function setAudioEnabled(enabled) {
     const tracks = media.audioTracks
     if (!tracks || typeof tracks.length !== 'number' || tracks.length === 0) {
-      return enabled
+      recoveryMuted = !enabled
+      applyMuteState()
+      return true
     }
     for (let index = 0; index < tracks.length; index++) tracks[index].enabled = enabled
+    recoveryMuted = false
+    applyMuteState()
     return true
   }
 
@@ -140,11 +162,7 @@ function createMediaRecoveryController({
 
   function performRestart(action) {
     if (!active || terminal || restart) return
-    if (!action.audioEnabled && !setAudioEnabled(false)) {
-      policy.restartFailed(media.currentTime)
-      fail('audio-tracks-unavailable')
-      return
-    }
+    if (!action.audioEnabled) setAudioEnabled(false)
 
     const token = session
     const wasPaused = media.paused
@@ -153,14 +171,10 @@ function createMediaRecoveryController({
     const canplay = () => {
       if (token !== session || !active || terminal || restart?.canplay !== canplay) return
       clearRestart()
-      if (!action.audioEnabled && !setAudioEnabled(false)) {
-        policy.restartFailed(media.currentTime)
-        fail('audio-tracks-unavailable')
-        return
-      }
+      if (!action.audioEnabled) setAudioEnabled(false)
       if (action.audioEnabled) setAudioEnabled(true)
       media.playbackRate = playbackRate
-      media.muted = userMuted
+      applyMuteState()
       media.currentTime = action.targetTime
       const policyAction = policy.restartSucceeded(action.targetTime, action.audioEnabled)
       if (policyAction) onAction(policyAction)
@@ -191,7 +205,7 @@ function createMediaRecoveryController({
     clearRestart()
     policy.reset()
     setAudioEnabled(true)
-    media.muted = userMuted
+    applyMuteState()
   }
 
   function cancel() {
@@ -213,7 +227,7 @@ function createMediaRecoveryController({
     const mode = policy.snapshot().mode
     if (mode === 'restarting') return
     if (mode === 'video-only') {
-      fail('video-decode-failed')
+      performRestart(policy.decodeError(media.currentTime))
       return
     }
     if (mode === 'probing-audio') {
@@ -266,28 +280,29 @@ function createMediaRecoveryController({
     const action = policy.progress(media.currentTime)
     if (!action) return
     if (action.type === 'probe-audio') {
-      if (!setAudioEnabled(true)) {
-        const fallback = policy.restartFailed(media.currentTime)
-        onAction(fallback)
-        return
-      }
+      setAudioEnabled(true)
     }
     onAction(action)
   }
 
   function resync() {
-    if (!active || terminal || restart) return
-    const mode = policy.snapshot().mode
-    performRestart({
-      type: 'restart',
-      targetTime: media.currentTime,
-      audioEnabled: mode !== 'video-only',
-    })
+    if (!active) {
+      onAction({ type: 'resync-unavailable' })
+      return false
+    }
+    session++
+    clearWaitingTimer()
+    clearRestart()
+    terminal = false
+    policy.reset()
+    setAudioEnabled(true)
+    performRestart(policy.manualRestart(media.currentTime))
+    return true
   }
 
   function setUserMuted(muted) {
     userMuted = !!muted
-    media.muted = userMuted
+    applyMuteState()
   }
 
   function snapshot() {
@@ -314,9 +329,19 @@ function getRecoveryNotice(action) {
     case 'restart':
       return action.audioEnabled
         ? { kind: 'restarting', message: '正在重新同步播放…', persistent: false }
-        : { kind: 'video-only', message: '偵測到破損音軌，已改為無聲繼續播放', persistent: true }
+        : {
+            kind: 'video-only',
+            message: action.skipSeconds
+              ? `偵測到損壞音訊，正在跳過 ${action.skipSeconds} 秒並暫時靜音…`
+              : '偵測到損壞音訊，已暫時靜音繼續播放',
+            persistent: true,
+          }
     case 'video-only':
-      return { kind: 'video-only', message: '破損區段將以無聲播放，稍後自動恢復音訊', persistent: true }
+      return {
+        kind: 'video-only',
+        message: `已略過損壞區段，${action.retryDelay || 6} 秒後自動恢復音訊`,
+        persistent: true,
+      }
     case 'probe-audio':
       return { kind: 'probing', message: '正在嘗試恢復音訊…', persistent: false }
     case 'audio-recovered':
@@ -325,6 +350,8 @@ function getRecoveryNotice(action) {
       return { kind: 'video-only', message: '音訊仍損壞，繼續無聲播放並稍後重試', persistent: true }
     case 'failed':
       return { kind: 'failed', message: '影片解碼失敗，無法自動恢復', persistent: true }
+    case 'resync-unavailable':
+      return { kind: 'unavailable', message: '請先開啟影片', persistent: false }
     default:
       return null
   }

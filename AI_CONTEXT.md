@@ -119,7 +119,7 @@ if (typeof module !== 'undefined') module.exports = { formatTime, clamp, ... }
 
 **Volume popup (compact mode)**: When `vol-compact` class is on body, the volume icon click toggles `#vol-popup` (vertical slider) instead of muting. `volPopup.addEventListener('click', e => e.stopPropagation())` prevents the document click handler from immediately closing the popup.
 
-## Current version: 1.5.3
+## Current version: 1.5.4
 
 ### Changelog
 - `1.0.0` — Initial: play/pause, progress, speed menu, keyboard, volume, file open/drop, custom titlebar, fullscreen, position memory, play/pause animation
@@ -129,6 +129,7 @@ if (typeof module !== 'undefined') module.exports = { formatTime, clamp, ... }
 - `1.5.1` — Volume range increased to 200% using Web Audio gain above 100%
 - `1.5.2` — Single-process multi-window shared settings; rewritten damaged-audio recovery with silent continuation and automatic sound restoration
 - `1.5.3` — Longer volume slider, refreshed transport and volume icons, and non-selectable speed controls
+- `1.5.4` — Restored damaged-audio skipping with mute fallback, progressive 1/2/3-second recovery, and a resync button that always responds and can revive failed playback
 
 ## Suggested next features (not yet built)
 

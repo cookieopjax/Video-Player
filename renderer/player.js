@@ -818,7 +818,6 @@ document.addEventListener('keydown', (e) => {
 document.getElementById('btn-screenshot').addEventListener('click', startCrop)
 
 function resyncVideo() {
-  if (!currentFilePath || !video.duration) return
   stopPositionSave(false)
   mediaRecovery.resync()
 }

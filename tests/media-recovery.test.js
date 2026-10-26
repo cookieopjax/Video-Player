@@ -5,15 +5,26 @@ const {
 } = require('../renderer/media-recovery')
 
 describe('createRecoveryPolicy', () => {
-  test('a decode error requests one restart just ahead with audio disabled', () => {
+  test('a decode error skips one second ahead with audio disabled', () => {
     const policy = createRecoveryPolicy()
 
     expect(policy.decodeError(12.5)).toEqual({
       type: 'restart',
-      targetTime: 12.75,
+      targetTime: 13.5,
       audioEnabled: false,
+      skipSeconds: 1,
     })
     expect(policy.snapshot().mode).toBe('restarting')
+  })
+
+  test('three consecutive decode errors skip one, two, then three seconds to cross a five-second gap', () => {
+    const policy = createRecoveryPolicy()
+
+    expect(policy.decodeError(10).skipSeconds).toBe(1)
+    policy.restartSucceeded(11, false)
+    expect(policy.decodeError(11).skipSeconds).toBe(2)
+    policy.restartSucceeded(13, false)
+    expect(policy.decodeError(13)).toMatchObject({ targetTime: 16, skipSeconds: 3 })
   })
 
   test('video-only playback probes audio after six seconds of media progress', () => {
@@ -104,7 +115,7 @@ describe('createRecoveryPolicy', () => {
   })
 })
 
-function createFakeMedia({ withAudioTracks = true } = {}) {
+function createFakeMedia({ withAudioTracks = true, audioTrackCount = 1 } = {}) {
   const listeners = new Map()
   const addedListeners = []
   const media = {
@@ -132,7 +143,9 @@ function createFakeMedia({ withAudioTracks = true } = {}) {
     listenerCount(type) { return listeners.get(type)?.size || 0 },
     lastAdded(type) { return [...addedListeners].reverse().find(item => item.type === type)?.listener },
   }
-  if (withAudioTracks) media.audioTracks = [{ enabled: true }]
+  if (withAudioTracks) {
+    media.audioTracks = Array.from({ length: audioTrackCount }, () => ({ enabled: true }))
+  }
   return media
 }
 
@@ -173,7 +186,7 @@ describe('createMediaRecoveryController', () => {
     media.playbackRate = 1
     media.emit('canplay')
 
-    expect(media.currentTime).toBe(10.25)
+    expect(media.currentTime).toBe(11)
     expect(media.playbackRate).toBe(1.5)
     expect(media.playCount).toBe(1)
     expect(media.audioTracks[0].enabled).toBe(false)
@@ -212,8 +225,11 @@ describe('createMediaRecoveryController', () => {
     expect(media.playCount).toBe(0)
   })
 
-  test('missing audioTracks fails safely without starting a reload loop', () => {
-    const media = createFakeMedia({ withAudioTracks: false })
+  test.each([
+    ['missing audioTracks', { withAudioTracks: false }],
+    ['an empty audioTracks list', { audioTrackCount: 0 }],
+  ])('%s falls back to muted recovery and still restarts playback', (_caseName, mediaOptions) => {
+    const media = createFakeMedia(mediaOptions)
     const actions = []
     const controller = createMediaRecoveryController({
       media,
@@ -223,13 +239,66 @@ describe('createMediaRecoveryController', () => {
     controller.beginSource()
 
     controller.handleError({ code: 3 })
-    controller.handleError({ code: 3 })
 
-    expect(media.loadCount).toBe(0)
-    expect(actions.at(-1)).toEqual({ type: 'failed', reason: 'audio-tracks-unavailable' })
+    expect(media.loadCount).toBe(1)
+    expect(media.muted).toBe(true)
+    expect(actions.at(-1)).toMatchObject({ type: 'restart', audioEnabled: false })
+
+    media.emit('canplay')
+
+    expect(controller.snapshot().mode).toBe('video-only')
+    expect(media.playCount).toBe(1)
+    expect(media.muted).toBe(true)
+
+    media.currentTime = 17
+    controller.handleTimeUpdate()
+
+    expect(media.muted).toBe(false)
+    expect(actions.at(-1)).toEqual({ type: 'probe-audio' })
   })
 
-  test('an error while already video-only does not recursively reload', () => {
+  test('consecutive decode errors keep skipping until playback is beyond a five-second damaged segment', () => {
+    const media = createFakeMedia()
+    const actions = []
+    const controller = createMediaRecoveryController({
+      media,
+      timers: createFakeTimers(),
+      onAction: action => actions.push(action),
+    })
+    controller.beginSource()
+    const startTime = media.currentTime
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      controller.handleError({ code: 3 })
+      expect(media.loadCount).toBe(attempt + 1)
+      media.emit('canplay')
+    }
+
+    expect(media.currentTime).toBeGreaterThanOrEqual(startTime + 5)
+    expect(actions).not.toContainEqual(expect.objectContaining({ type: 'failed' }))
+    expect(controller.snapshot().mode).toBe('video-only')
+  })
+
+  test('manual resync revives a terminal recovery session and always reloads', () => {
+    const media = createFakeMedia()
+    const actions = []
+    const controller = createMediaRecoveryController({
+      media,
+      timers: createFakeTimers(),
+      onAction: action => actions.push(action),
+    })
+    controller.beginSource()
+    controller.handleError({ code: 4 })
+    expect(controller.snapshot().mode).toBe('failed')
+
+    controller.resync()
+
+    expect(media.loadCount).toBe(1)
+    expect(actions.at(-1)).toMatchObject({ type: 'restart', audioEnabled: true })
+    expect(controller.snapshot().mode).toBe('restarting')
+  })
+
+  test('manual resync replaces an in-flight automatic restart instead of ignoring the click', () => {
     const media = createFakeMedia()
     const actions = []
     const controller = createMediaRecoveryController({
@@ -239,12 +308,43 @@ describe('createMediaRecoveryController', () => {
     })
     controller.beginSource()
     controller.handleError({ code: 3 })
-    media.emit('canplay')
-
-    controller.handleError({ code: 3 })
-
     expect(media.loadCount).toBe(1)
-    expect(actions.at(-1)).toEqual({ type: 'failed', reason: 'video-decode-failed' })
+
+    controller.resync()
+
+    expect(media.loadCount).toBe(2)
+    expect(media.listenerCount('canplay')).toBe(1)
+    expect(actions.at(-1)).toMatchObject({ type: 'restart', audioEnabled: true })
+  })
+
+  test('manual resync without an active video reports why nothing can be restarted', () => {
+    const media = createFakeMedia()
+    const actions = []
+    const controller = createMediaRecoveryController({
+      media,
+      timers: createFakeTimers(),
+      onAction: action => actions.push(action),
+    })
+
+    expect(controller.resync()).toBe(false)
+    expect(media.loadCount).toBe(0)
+    expect(actions).toEqual([{ type: 'resync-unavailable' }])
+  })
+
+  test('manual resync uses the start when the decoder no longer exposes a finite position', () => {
+    const media = createFakeMedia()
+    const actions = []
+    const controller = createMediaRecoveryController({
+      media,
+      timers: createFakeTimers(),
+      onAction: action => actions.push(action),
+    })
+    controller.beginSource()
+    media.currentTime = Number.NaN
+
+    controller.resync()
+
+    expect(actions.at(-1)).toMatchObject({ type: 'restart', targetTime: 0 })
   })
 
   test('user mute remains independent while recovery disables and probes audio', () => {
@@ -255,7 +355,7 @@ describe('createMediaRecoveryController', () => {
     controller.handleError({ code: 3 })
     media.emit('canplay')
 
-    media.currentTime = 16.25
+    media.currentTime = 17
     controller.handleTimeUpdate()
 
     expect(media.audioTracks[0].enabled).toBe(true)
@@ -273,11 +373,11 @@ describe('createMediaRecoveryController', () => {
     controller.beginSource()
     controller.handleError({ code: 3 })
     media.emit('canplay')
-    media.currentTime = 16.25
+    media.currentTime = 17
     controller.handleTimeUpdate()
     expect(media.audioTracks[0].enabled).toBe(true)
 
-    media.currentTime = 16.5
+    media.currentTime = 17.25
     controller.handleWaiting()
     timers.runDelay(1000)
 
@@ -296,6 +396,9 @@ describe('getRecoveryNotice', () => {
       kind: 'probing',
       persistent: false,
     })
+    expect(getRecoveryNotice({ type: 'restart', audioEnabled: false, skipSeconds: 2 })).toMatchObject({
+      message: expect.stringContaining('跳過 2 秒'),
+    })
   })
 
   test('distinguishes recovered audio from a terminal playback failure', () => {
@@ -306,6 +409,10 @@ describe('getRecoveryNotice', () => {
     expect(getRecoveryNotice({ type: 'failed', reason: 'restart-timeout' })).toMatchObject({
       kind: 'failed',
       persistent: true,
+    })
+    expect(getRecoveryNotice({ type: 'resync-unavailable' })).toMatchObject({
+      kind: 'unavailable',
+      persistent: false,
     })
   })
 })
